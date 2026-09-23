@@ -104,25 +104,30 @@ artist come from the file's own metadata, falling back to the file name.
 ## Deployment
 
 `.github/workflows/deploy.yml` builds on every push to `main` and deploys
-`dist/` to Cloudflare Pages with Wrangler.
+`dist/` as a static-assets Worker (`wrangler.jsonc`) with Wrangler. It is
+served at <https://tabviewer.dalagerlabs.com> (a Workers Custom Domain; the
+workers.dev URL is disabled). To deploy by hand, build with
+`VITE_SOUNDFONT_URL` set and run `npx wrangler deploy`.
 
-The soundfont is not deployed with the site: Cloudflare Pages rejects files
-over 25 MiB and `MuseScore_General.sf3` is 40 MB. Instead the build points the
-player at a hosted copy via `VITE_SOUNDFONT_URL`. One-time setup:
+The soundfont is not deployed with the site: Workers static assets reject
+files over 25 MiB and `MuseScore_General.sf3` is 40 MB, so
+`public/.assetsignore` excludes it. Instead the build points the player at a
+hosted copy in the R2 bucket `tab-viewer-soundfont` via `VITE_SOUNDFONT_URL`.
+One-time setup (already done for the bucket and Worker):
 
 1. Create an R2 bucket, upload `MuseScore_General.sf3` (the file
    `npm run soundfont` saves as `public/soundfont/default.sf3`), and enable
    public access on the bucket (or attach a custom domain).
-2. Add a CORS rule to the bucket allowing `GET` from the Pages site's origin.
+2. Add a CORS rule to the bucket allowing `GET` from the site's origin.
    The player fetches the font cross-origin, so without this it fails to
    load.
 3. In the GitHub repo, under *Settings → Secrets and variables → Actions*:
    - Variable `SOUNDFONT_URL`: the public URL of the `.sf3` file.
-   - Secret `CLOUDFLARE_API_TOKEN`: a token with the *Cloudflare Pages: Edit*
-     permission.
+   - Secret `CLOUDFLARE_API_TOKEN`: a token made from the *Edit Cloudflare
+     Workers* template.
    - Secret `CLOUDFLARE_ACCOUNT_ID`.
-4. Create a Pages project named `tab-viewer` (Wrangler creates it on first
-   deploy if it does not exist).
+
+Wrangler creates the `tab-viewer` Worker on first deploy.
 
 ## Other scripts
 

@@ -1,0 +1,3 @@
+# The full soundfont is 40 MB, over the 25 MiB per-file asset limit. Deployed
+# builds load it from R2 via VITE_SOUNDFONT_URL instead (see README).
+soundfont/default.sf3
