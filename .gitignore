@@ -1,0 +1,32 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Generated build artifacts that land in the source tree.
+# alphatab-vite's copyAssetsPlugin writes into public/ (not dist/) at buildStart,
+# and scripts/build-manifest.mjs generates the rest. ~7.5 MB of binaries.
+public/font
+public/soundfont
+public/tabs
+src/data/tabs.json
