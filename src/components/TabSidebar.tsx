@@ -1,5 +1,5 @@
 import { Star, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useFavorites } from '@/hooks/useFavorites'
@@ -14,12 +14,23 @@ interface TabSidebarProps {
   onRemove: (id: string) => void
 }
 
-/** Section label to show above row `i`, if it starts a new section. */
-function sectionHeading(shown: TabEntry[], i: number, hasImports: boolean): string | null {
-  if (!hasImports) return null
+/**
+ * Section label to show above row `i`, if it starts a new section. Labels are
+ * only needed when there is more than one section.
+ */
+function sectionHeading(shown: TabEntry[], i: number, labelled: boolean): string | null {
+  if (!labelled) return null
   const tab = shown[i]
   if (i === 0) return tab.imported ? 'Imported' : 'Collection'
   return shown[i - 1].imported && !tab.imported ? 'Collection' : null
+}
+
+function SectionHeading({ children }: { children: string }) {
+  return (
+    <h3 className="w-full px-2.5 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      {children}
+    </h3>
+  )
 }
 
 /** Rows rendered initially, and added each time the sentinel comes into view. */
@@ -30,7 +41,7 @@ export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarP
   const hasImports = useMemo(() => tabs.some((t) => t.imported), [tabs])
   const [visible, setVisible] = useState(PAGE_SIZE)
   const sentinelRef = useRef<HTMLLIElement>(null)
-  const { isFavorite, toggleFavorite } = useFavorites()
+  const { favorites, isFavorite, toggleFavorite } = useFavorites()
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -56,6 +67,15 @@ export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarP
   const shown = filtered.slice(0, effectiveVisible)
   const hasMore = effectiveVisible < filtered.length
 
+  // Starred pieces are repeated at the top rather than moved there, so starring
+  // a row does not make it jump out from under the pointer. Few enough that
+  // they need no paging.
+  const starred = useMemo(
+    () => filtered.filter((t) => favorites.has(t.id)),
+    [filtered, favorites],
+  )
+  const labelled = hasImports || starred.length > 0
+
   // Grow the list when the sentinel scrolls into the ScrollArea's viewport.
   useEffect(() => {
     const sentinel = sentinelRef.current
@@ -76,6 +96,48 @@ export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarP
     return () => observer.disconnect()
   }, [hasMore, effectiveVisible, filtered.length])
 
+  function renderRow(tab: TabEntry, keyPrefix = '') {
+    const favorite = isFavorite(tab.id)
+    return (
+      <li key={keyPrefix + tab.id} className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onSelect(tab.id)}
+          className={cn(
+            'w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-left text-sm transition-colors',
+            tab.id === selectedId
+              ? 'bg-neutral-900 text-white'
+              : 'text-neutral-700 hover:bg-neutral-200',
+          )}
+          title={tab.title}
+        >
+          {tab.title}
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleFavorite(tab.id)}
+          className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-amber-500"
+          aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+          aria-pressed={favorite}
+          title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Star className={cn('size-4', favorite && 'fill-amber-400 text-amber-500')} />
+        </button>
+        {tab.imported && (
+          <button
+            type="button"
+            onClick={() => onRemove(tab.id)}
+            className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-600"
+            aria-label="Remove imported piece"
+            title="Remove imported piece"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </li>
+    )
+  }
+
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50">
       <div className="border-b border-neutral-200 p-3">
@@ -93,53 +155,24 @@ export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarP
 
       <ScrollArea className="min-h-0 flex-1">
         <ul className="p-2">
+          {starred.length > 0 && (
+            <li>
+              <SectionHeading>Starred</SectionHeading>
+            </li>
+          )}
+          {starred.map((tab) => renderRow(tab, 'starred:'))}
+
           {shown.map((tab, i) => {
-            const favorite = isFavorite(tab.id)
-            const heading = sectionHeading(shown, i, hasImports)
-            return (
-              <li key={tab.id} className="flex flex-wrap items-center gap-1">
-                {heading && (
-                  <h3 className="w-full px-2.5 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    {heading}
-                  </h3>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onSelect(tab.id)}
-                  className={cn(
-                    'w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-left text-sm transition-colors',
-                    tab.id === selectedId
-                      ? 'bg-neutral-900 text-white'
-                      : 'text-neutral-700 hover:bg-neutral-200',
-                  )}
-                  title={tab.title}
-                >
-                  {tab.title}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(tab.id)}
-                  className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-amber-500"
-                  aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
-                  aria-pressed={favorite}
-                  title={favorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <Star
-                    className={cn('size-4', favorite && 'fill-amber-400 text-amber-500')}
-                  />
-                </button>
-                {tab.imported && (
-                  <button
-                    type="button"
-                    onClick={() => onRemove(tab.id)}
-                    className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-600"
-                    aria-label="Remove imported piece"
-                    title="Remove imported piece"
-                  >
-                    <X className="size-4" />
-                  </button>
-                )}
-              </li>
+            const heading = sectionHeading(shown, i, labelled)
+            return heading ? (
+              <Fragment key={tab.id}>
+                <li>
+                  <SectionHeading>{heading}</SectionHeading>
+                </li>
+                {renderRow(tab)}
+              </Fragment>
+            ) : (
+              renderRow(tab)
             )
           })}
 
