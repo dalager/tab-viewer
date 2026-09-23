@@ -15,9 +15,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -28,9 +28,9 @@ jobs:
         env:
           VITE_SOUNDFONT_URL: ${{ vars.SOUNDFONT_URL }}
 
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         with:
-          # The action's default Wrangler (3.x) cannot read wrangler.jsonc.
+          # Pinned so deploys are reproducible; keep in step with local Wrangler.
           wranglerVersion: '4.137.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
