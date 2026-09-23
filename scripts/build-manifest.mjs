@@ -13,10 +13,9 @@ import { parse } from 'csv-parse/sync'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(here, '..')
-const projectRoot = path.resolve(appRoot, '..')
 
-const CSV = path.join(projectRoot, 'bach_guitar_tabs.csv')
-const SRC_DIR = path.join(projectRoot, 'bach_tabs')
+const CSV = path.join(appRoot, 'collection', 'index.csv')
+const SRC_DIR = path.join(appRoot, 'collection', 'tabs')
 const OUT_DIR = path.join(appRoot, 'public', 'tabs')
 const MANIFEST = path.join(appRoot, 'src', 'data', 'tabs.json')
 

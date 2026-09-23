@@ -53,9 +53,9 @@ export function buildSettings(viewport: HTMLElement | null): alphaTab.json.Setti
     },
     player: {
       playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
-      // Fetched by scripts/fetch-soundfont.mjs. MuseScore_General, or the
-      // bundled SONiVOX bank if the download was unavailable.
-      soundFont: '/soundfont/default.sf3',
+      // Locally: fetched by scripts/fetch-soundfont.mjs. In production: a
+      // hosted copy, since the file is too large for Cloudflare Pages.
+      soundFont: import.meta.env.VITE_SOUNDFONT_URL || '/soundfont/default.sf3',
       // The scroll container, so the playback cursor keeps itself in view.
       ...(viewport ? { scrollElement: viewport } : {}),
       scrollOffsetY: -20,

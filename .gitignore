@@ -30,3 +30,7 @@ public/font
 public/soundfont
 public/tabs
 src/data/tabs.json
+
+# Scrape sources (download URLs) stay local; only index.csv is committed.
+collection/sources.csv
+collection/multi-instrument-tabs/sources.csv

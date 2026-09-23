@@ -69,6 +69,14 @@ async function download(url) {
   return Buffer.concat(chunks)
 }
 
+// Production points the player at a hosted copy (see src/score/settings.ts),
+// so nothing needs to land in public/ — and must not, since Cloudflare Pages
+// rejects files over 25 MiB.
+if (process.env.VITE_SOUNDFONT_URL) {
+  console.log(`fetch-soundfont: skipped, using ${process.env.VITE_SOUNDFONT_URL}`)
+  process.exit(0)
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true })
 
 if (fs.existsSync(TARGET) && fs.statSync(TARGET).size === EXPECTED_BYTES) {
