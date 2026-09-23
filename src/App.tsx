@@ -10,7 +10,7 @@ import { useAlphaTab } from '@/hooks/useAlphaTab'
 import { useFullscreen } from '@/hooks/useFullscreen'
 import { type Shortcut, useHotkeys } from '@/hooks/useHotkeys'
 import { computeSystemTops, pageBy, scrollToEdge } from '@/score/paging'
-import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE } from '@/score/settings'
+import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
 
 const STORAGE_KEY = 'tab-viewer:selected'
 
@@ -25,7 +25,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [allTracks, setAllTracks] = useState(true)
+  // Empty set means "render every track".
+  const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set())
   const [scale, setScale] = useState(1)
   const [layoutMode, setLayoutMode] = useState<alphaTab.LayoutMode>(alphaTab.LayoutMode.Page)
 
@@ -36,9 +37,16 @@ export default function App() {
     error,
     renderVersion,
     loadFile,
+    renderTracks,
     isPlayerReady,
     isPlaying,
+    cursorVisible,
     metronome,
+    speed,
+    setSpeed,
+    nudgeSpeed,
+    guitarOnly,
+    toggleGuitarOnly,
     playPause,
     stop,
     toggleMetronome,
@@ -58,11 +66,35 @@ export default function App() {
     if (selectedId) localStorage.setItem(STORAGE_KEY, selectedId)
   }, [selectedId])
 
+  // A new piece starts with every track shown again. Adjusting during render
+  // rather than inside the load effect avoids a cascading second render.
+  const [tracksPiece, setTracksPiece] = useState(selectedId)
+  if (tracksPiece !== selectedId) {
+    setTracksPiece(selectedId)
+    setSelectedTracks(new Set())
+  }
+
   useEffect(() => {
     if (!selected || !api) return
-    void loadFile(selected.file, allTracks)
+    void loadFile(selected.file)
     viewportRef.current?.scrollTo({ top: 0 })
-  }, [selected, api, allTracks, loadFile])
+  }, [selected, api, loadFile])
+
+  const changeTracks = useCallback(
+    (next: Set<number>) => {
+      setSelectedTracks(next)
+      renderTracks(next)
+    },
+    [renderTracks],
+  )
+
+  // `t` cycles between every track and the first one only.
+  const toggleTracks = useCallback(() => {
+    const all = score?.tracks ?? []
+    if (all.length === 0) return
+    const firstOnly = selectedTracks.size === 1 && selectedTracks.has(all[0].index)
+    changeTracks(firstOnly ? new Set() : new Set([all[0].index]))
+  }, [score, selectedTracks, changeTracks])
 
   const applyDisplaySetting = useCallback(
     (mutate: () => void) => {
@@ -225,7 +257,7 @@ export default function App() {
         label: 't',
         description: 'All tracks / first track',
         group: 'View',
-        run: () => setAllTracks((v) => !v),
+        run: toggleTracks,
       },
       {
         keys: ['+', '='],
@@ -270,6 +302,34 @@ export default function App() {
         group: 'Playback',
         run: toggleMetronome,
       },
+      {
+        keys: ['g'],
+        label: 'g',
+        description: 'Play everything on nylon guitar',
+        group: 'Playback',
+        run: toggleGuitarOnly,
+      },
+      {
+        keys: [','],
+        label: ',',
+        description: 'Slower',
+        group: 'Playback',
+        run: () => nudgeSpeed(-SPEED_STEP),
+      },
+      {
+        keys: ['.'],
+        label: '.',
+        description: 'Faster',
+        group: 'Playback',
+        run: () => nudgeSpeed(SPEED_STEP),
+      },
+      {
+        keys: ['\\'],
+        label: '\\',
+        description: 'Reset speed to 100%',
+        group: 'Playback',
+        run: () => setSpeed(1),
+      },
 
       {
         keys: ['?'],
@@ -297,6 +357,7 @@ export default function App() {
       goToPiece,
       toggleFullscreen,
       cycleLayout,
+      toggleTracks,
       zoomBy,
       resetZoom,
       exitFullscreen,
@@ -305,6 +366,9 @@ export default function App() {
       playPause,
       stop,
       toggleMetronome,
+      setSpeed,
+      nudgeSpeed,
+      toggleGuitarOnly,
     ],
   )
 
@@ -314,8 +378,9 @@ export default function App() {
     <div ref={shellRef} className="flex h-screen w-screen flex-col overflow-hidden bg-white">
       <Toolbar
         tab={selected}
-        trackCount={score?.tracks.length ?? 0}
-        allTracks={allTracks}
+        tracks={score?.tracks ?? []}
+        selectedTracks={selectedTracks}
+        onTracksChange={changeTracks}
         scale={scale}
         layoutMode={layoutMode}
         isFullscreen={isFullscreen}
@@ -323,11 +388,14 @@ export default function App() {
         isPlayerReady={isPlayerReady}
         isPlaying={isPlaying}
         metronome={metronome}
+        speed={speed}
+        onSpeedChange={setSpeed}
+        guitarOnly={guitarOnly}
+        onToggleGuitarOnly={toggleGuitarOnly}
         onPlayPause={playPause}
         onStop={stop}
         onToggleMetronome={toggleMetronome}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        onToggleTracks={() => setAllTracks((v) => !v)}
         onCycleLayout={cycleLayout}
         onZoom={zoomBy}
         onResetZoom={resetZoom}
@@ -343,6 +411,7 @@ export default function App() {
           canvasRef={canvasRef}
           isLoading={isLoading}
           error={error}
+          cursorVisible={cursorVisible}
         />
       </div>
 

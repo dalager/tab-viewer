@@ -9,8 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "manifest": "node scripts/build-manifest.mjs",
-    "predev": "npm run manifest",
-    "prebuild": "npm run manifest"
+    "predev": "npm run manifest && npm run soundfont",
+    "prebuild": "npm run manifest && npm run soundfont",
+    "soundfont": "node scripts/fetch-soundfont.mjs"
   },
   "dependencies": {
     "@coderline/alphatab": "^1.8.4",

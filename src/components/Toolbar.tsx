@@ -1,4 +1,6 @@
 import type * as alphaTab from '@coderline/alphatab'
+import { SpeedControl } from '@/components/SpeedControl'
+import { TrackPicker } from '@/components/TrackPicker'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { LAYOUT_LABELS } from '@/score/settings'
@@ -6,8 +8,9 @@ import type { TabEntry } from '@/types'
 
 interface ToolbarProps {
   tab: TabEntry | null
-  trackCount: number
-  allTracks: boolean
+  tracks: alphaTab.model.Track[]
+  selectedTracks: Set<number>
+  onTracksChange: (next: Set<number>) => void
   scale: number
   layoutMode: alphaTab.LayoutMode
   isFullscreen: boolean
@@ -15,11 +18,14 @@ interface ToolbarProps {
   isPlayerReady: boolean
   isPlaying: boolean
   metronome: boolean
+  speed: number
+  onSpeedChange: (value: number) => void
+  guitarOnly: boolean
+  onToggleGuitarOnly: () => void
   onPlayPause: () => void
   onStop: () => void
   onToggleMetronome: () => void
   onToggleSidebar: () => void
-  onToggleTracks: () => void
   onCycleLayout: () => void
   onZoom: (delta: number) => void
   onResetZoom: () => void
@@ -29,7 +35,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const { tab, trackCount, allTracks, scale, layoutMode } = props
+  const { tab, tracks, scale, layoutMode } = props
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3">
@@ -46,7 +52,6 @@ export function Toolbar(props: ToolbarProps) {
         {tab && (
           <p className="truncate text-xs text-neutral-500">
             {tab.artist} · {tab.ext.toUpperCase()}
-            {trackCount > 0 && ` · ${trackCount} track${trackCount === 1 ? '' : 's'}`}
           </p>
         )}
       </div>
@@ -57,15 +62,11 @@ export function Toolbar(props: ToolbarProps) {
 
       <Separator orientation="vertical" className="h-6" />
 
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={props.onToggleTracks}
-        disabled={trackCount < 2}
-        title="Toggle all tracks (t)"
-      >
-        {allTracks ? 'All tracks' : 'First track'}
-      </Button>
+      <TrackPicker
+        tracks={tracks}
+        selected={props.selectedTracks}
+        onChange={props.onTracksChange}
+      />
 
       <Button variant="ghost" size="sm" onClick={props.onCycleLayout} title="Cycle layout (l)">
         {LAYOUT_LABELS[layoutMode] ?? 'Page'}
@@ -111,6 +112,11 @@ export function Toolbar(props: ToolbarProps) {
         >
           Stop
         </Button>
+        <SpeedControl
+          speed={props.speed}
+          onChange={props.onSpeedChange}
+          disabled={!props.isPlayerReady}
+        />
         <Button
           variant="ghost"
           size="sm"
@@ -120,6 +126,16 @@ export function Toolbar(props: ToolbarProps) {
           className={props.metronome ? 'text-neutral-900' : 'text-neutral-400'}
         >
           Metronome
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={props.onToggleGuitarOnly}
+          disabled={!props.isPlayerReady}
+          title="Play everything on nylon guitar (g)"
+          className={props.guitarOnly ? 'text-neutral-900' : 'text-neutral-400'}
+        >
+          As guitar
         </Button>
       </div>
 

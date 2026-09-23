@@ -119,12 +119,19 @@
   margin: 0 auto;
 }
 
-/* Playback cursors. alphaTab renders these elements but leaves them unstyled. */
-.at-cursor-bar {
+/* Playback cursors. alphaTab renders these elements but leaves them unstyled,
+   and parks them on bar 1 as soon as the player is ready. They stay hidden
+   until playback actually starts (see data-cursor on .at-wrap). */
+.at-cursor-bar,
+.at-cursor-beat {
+  background: transparent;
+}
+
+[data-cursor='on'] .at-cursor-bar {
   background: rgba(250, 204, 21, 0.25);
 }
 
-.at-cursor-beat {
+[data-cursor='on'] .at-cursor-beat {
   width: 3px;
   background: rgba(23, 23, 23, 0.7);
 }

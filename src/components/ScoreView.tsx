@@ -6,6 +6,7 @@ interface ScoreViewProps {
   canvasRef: RefObject<HTMLDivElement | null>
   isLoading: boolean
   error: string | null
+  cursorVisible: boolean
   className?: string
 }
 
@@ -18,10 +19,14 @@ export function ScoreView({
   canvasRef,
   isLoading,
   error,
+  cursorVisible,
   className,
 }: ScoreViewProps) {
   return (
-    <div className={cn('at-wrap relative flex-1 bg-white', className)}>
+    <div
+      className={cn('at-wrap relative flex-1 bg-white', className)}
+      data-cursor={cursorVisible ? 'on' : 'off'}
+    >
       {isLoading && (
         <div className="absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-neutral-900" />
       )}
