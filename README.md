@@ -92,6 +92,15 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 Click the star next to a piece in the sidebar to favourite it. Favourites and
 the last-opened piece are stored in the browser's `localStorage`.
 
+### Importing your own tabs
+
+Press `i`, click *Import* in the toolbar, or drop `.gp3` / `.gp4` / `.gp5` /
+`.gpx` / `.gp` files anywhere in the window to add pieces that are not part of
+the deployed collection. They are stored in the browser's IndexedDB, so they
+survive reloads but never leave your machine, and are listed under *Imported*
+at the top of the sidebar with a button to remove them again. The title and
+artist come from the file's own metadata, falling back to the file name.
+
 ## Deployment
 
 `.github/workflows/deploy.yml` builds on every push to `main` and deploys

@@ -32,6 +32,7 @@ interface ToolbarProps {
   onToggleFullscreen: () => void
   onOpenPalette: () => void
   onOpenHelp: () => void
+  onImport: () => void
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -58,6 +59,15 @@ export function Toolbar(props: ToolbarProps) {
 
       <Button variant="ghost" size="sm" onClick={props.onOpenPalette} title="Search (Ctrl+K)">
         Search
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={props.onImport}
+        title="Import Guitar Pro files (i), or drop them anywhere"
+      >
+        Import
       </Button>
 
       <Separator orientation="vertical" className="h-6" />

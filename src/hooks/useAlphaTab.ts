@@ -10,6 +10,8 @@ export interface UseAlphaTab {
   /** Bumps on every renderFinished; paging uses it to invalidate cached bounds. */
   renderVersion: number
   loadFile: (url: string) => Promise<void>
+  /** Load a file already in memory, e.g. one the user imported. */
+  loadBytes: (buffer: ArrayBuffer) => void
   /** Render only these track indexes. Empty set is treated as "all". */
   renderTracks: (indexes: Set<number>) => void
   /** True once the soundfont is loaded and playback is usable. */
@@ -113,7 +115,7 @@ export function useAlphaTab(
     }
     const onError = (e: unknown) => {
       setIsLoading(false)
-      setError(e instanceof Error ? e.message : String(e))
+      setError(`Could not render this piece: ${e instanceof Error ? e.message : String(e)}`)
     }
     const onPlayerReady = () => setIsPlayerReady(true)
     const onPlayerStateChanged = (args: alphaTab.synth.PlayerStateChangedEventArgs) => {
@@ -146,29 +148,45 @@ export function useAlphaTab(
     }
   }, [containerRef, viewportRef])
 
-  const loadFile = useCallback(async (url: string) => {
-    const instance = apiRef.current
-    if (!instance) return
-
-    const token = ++loadToken.current
+  /** Marks a new load as the current one; any earlier in-flight fetch is dropped. */
+  const beginLoad = useCallback(() => {
     setIsLoading(true)
     setError(null)
+    return ++loadToken.current
+  }, [])
 
-    try {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
-      const buffer = await response.arrayBuffer()
-      if (token !== loadToken.current) return // superseded by a newer selection
-
+  const loadBytes = useCallback(
+    (buffer: ArrayBuffer) => {
+      const instance = apiRef.current
+      if (!instance) return
+      beginLoad()
       // Always load every track ([-1]); which ones are *rendered* is a separate
       // concern handled by renderTracks, so toggling needs no refetch.
       instance.load(buffer, [-1])
-    } catch (e) {
-      if (token !== loadToken.current) return
-      setIsLoading(false)
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }, [])
+    },
+    [beginLoad],
+  )
+
+  const loadFile = useCallback(
+    async (url: string) => {
+      const instance = apiRef.current
+      if (!instance) return
+
+      const token = beginLoad()
+      try {
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+        const buffer = await response.arrayBuffer()
+        if (token !== loadToken.current) return // superseded by a newer selection
+        instance.load(buffer, [-1])
+      } catch (e) {
+        if (token !== loadToken.current) return
+        setIsLoading(false)
+        setError(`Could not load this piece: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    [beginLoad],
+  )
 
   const renderTracks = useCallback((indexes: Set<number>) => {
     const instance = apiRef.current
@@ -236,6 +254,7 @@ export function useAlphaTab(
     error,
     renderVersion,
     loadFile,
+    loadBytes,
     renderTracks,
     isPlayerReady,
     isPlaying,

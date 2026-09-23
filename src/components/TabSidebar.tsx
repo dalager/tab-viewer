@@ -1,4 +1,4 @@
-import { Star } from 'lucide-react'
+import { Star, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -10,13 +10,24 @@ interface TabSidebarProps {
   tabs: TabEntry[]
   selectedId: string | null
   onSelect: (id: string) => void
+  /** Called for pieces with `imported` set; they get a remove button. */
+  onRemove: (id: string) => void
+}
+
+/** Section label to show above row `i`, if it starts a new section. */
+function sectionHeading(shown: TabEntry[], i: number, hasImports: boolean): string | null {
+  if (!hasImports) return null
+  const tab = shown[i]
+  if (i === 0) return tab.imported ? 'Imported' : 'Collection'
+  return shown[i - 1].imported && !tab.imported ? 'Collection' : null
 }
 
 /** Rows rendered initially, and added each time the sentinel comes into view. */
 const PAGE_SIZE = 60
 
-export function TabSidebar({ tabs, selectedId, onSelect }: TabSidebarProps) {
+export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarProps) {
   const [query, setQuery] = useState('')
+  const hasImports = useMemo(() => tabs.some((t) => t.imported), [tabs])
   const [visible, setVisible] = useState(PAGE_SIZE)
   const sentinelRef = useRef<HTMLLIElement>(null)
   const { isFavorite, toggleFavorite } = useFavorites()
@@ -82,10 +93,16 @@ export function TabSidebar({ tabs, selectedId, onSelect }: TabSidebarProps) {
 
       <ScrollArea className="min-h-0 flex-1">
         <ul className="p-2">
-          {shown.map((tab) => {
+          {shown.map((tab, i) => {
             const favorite = isFavorite(tab.id)
+            const heading = sectionHeading(shown, i, hasImports)
             return (
-              <li key={tab.id} className="flex items-center gap-1">
+              <li key={tab.id} className="flex flex-wrap items-center gap-1">
+                {heading && (
+                  <h3 className="w-full px-2.5 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                    {heading}
+                  </h3>
+                )}
                 <button
                   type="button"
                   onClick={() => onSelect(tab.id)}
@@ -111,6 +128,17 @@ export function TabSidebar({ tabs, selectedId, onSelect }: TabSidebarProps) {
                     className={cn('size-4', favorite && 'fill-amber-400 text-amber-500')}
                   />
                 </button>
+                {tab.imported && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(tab.id)}
+                    className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-600"
+                    aria-label="Remove imported piece"
+                    title="Remove imported piece"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
               </li>
             )
           })}

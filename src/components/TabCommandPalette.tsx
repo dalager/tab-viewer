@@ -22,6 +22,23 @@ export function TabCommandPalette({
   onOpenChange,
   onSelect,
 }: TabCommandPaletteProps) {
+  const imported = tabs.filter((t) => t.imported)
+  const bundled = tabs.filter((t) => !t.imported)
+
+  const renderItem = (tab: TabEntry) => (
+    <CommandItem
+      key={tab.id}
+      value={tab.title}
+      onSelect={() => {
+        onSelect(tab.id)
+        onOpenChange(false)
+      }}
+    >
+      <span className="flex-1 truncate">{tab.title}</span>
+      <span className="shrink-0 text-xs uppercase text-neutral-400">{tab.ext}</span>
+    </CommandItem>
+  )
+
   return (
     <CommandDialog
       open={open}
@@ -35,21 +52,12 @@ export function TabCommandPalette({
         <CommandInput placeholder="Search pieces…" />
         <CommandList className="max-h-[60vh]">
           <CommandEmpty>No pieces found.</CommandEmpty>
-          <CommandGroup heading={`${tabs.length} pieces`}>
-            {tabs.map((tab) => (
-              <CommandItem
-                key={tab.id}
-                value={tab.title}
-                onSelect={() => {
-                  onSelect(tab.id)
-                  onOpenChange(false)
-                }}
-              >
-                <span className="flex-1 truncate">{tab.title}</span>
-                <span className="shrink-0 text-xs uppercase text-neutral-400">{tab.ext}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
+          {imported.length > 0 && (
+            <CommandGroup heading={`${imported.length} imported`}>
+              {imported.map(renderItem)}
+            </CommandGroup>
+          )}
+          <CommandGroup heading={`${bundled.length} pieces`}>{bundled.map(renderItem)}</CommandGroup>
         </CommandList>
       </Command>
     </CommandDialog>

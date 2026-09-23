@@ -32,8 +32,8 @@ export function ScoreView({
       )}
 
       {error && (
-        <div className="absolute inset-x-0 top-0 z-10 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
-          Could not render this piece: {error}
+        <div className="absolute inset-x-0 top-0 z-10 border-b border-red-200 bg-red-50 px-4 py-2 text-sm whitespace-pre-line text-red-800">
+          {error}
         </div>
       )}
 

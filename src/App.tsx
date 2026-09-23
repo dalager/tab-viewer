@@ -9,6 +9,7 @@ import { tabs } from '@/data/tabs'
 import { useAlphaTab } from '@/hooks/useAlphaTab'
 import { useFullscreen } from '@/hooks/useFullscreen'
 import { type Shortcut, useHotkeys } from '@/hooks/useHotkeys'
+import { IMPORT_ACCEPT, useImportedTabs } from '@/hooks/useImportedTabs'
 import { computeSystemTops, pageBy, scrollToEdge } from '@/score/paging'
 import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
 
@@ -29,6 +30,20 @@ export default function App() {
   const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set())
   const [scale, setScale] = useState(1)
   const [layoutMode, setLayoutMode] = useState<alphaTab.LayoutMode>(alphaTab.LayoutMode.Page)
+  const [dragDepth, setDragDepth] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const {
+    imported,
+    ready: importedReady,
+    error: importError,
+    importFiles,
+    removeImported,
+    getBytes,
+  } = useImportedTabs()
+
+  // Imported pieces first, so they sit at the top of the sidebar.
+  const allTabs = useMemo(() => [...imported, ...tabs], [imported])
 
   const {
     api,
@@ -37,6 +52,7 @@ export default function App() {
     error,
     renderVersion,
     loadFile,
+    loadBytes,
     renderTracks,
     isPlayerReady,
     isPlaying,
@@ -53,8 +69,20 @@ export default function App() {
   } = useAlphaTab(canvasRef, viewportRef)
   const { isFullscreen, toggle: toggleFullscreen, exit: exitFullscreen } = useFullscreen(shellRef)
 
-  const selectedIndex = useMemo(() => tabs.findIndex((t) => t.id === selectedId), [selectedId])
-  const selected = selectedIndex >= 0 ? tabs[selectedIndex] : null
+  const selectedIndex = useMemo(
+    () => allTabs.findIndex((t) => t.id === selectedId),
+    [allTabs, selectedId],
+  )
+  const selected = selectedIndex >= 0 ? allTabs[selectedIndex] : null
+
+  // A remembered selection may point at an import that has since been removed
+  // (or one not yet read from IndexedDB). Once the imports are known, fall back
+  // to the first bundled piece rather than showing nothing. Adjusted during
+  // render, like tracksPiece below, so it settles in the same pass.
+  const fallbackId = tabs[0]?.id ?? null
+  if (importedReady && selectedIndex < 0 && selectedId !== fallbackId) {
+    setSelectedId(fallbackId)
+  }
 
   // Cached staff-system boundaries, invalidated whenever a render completes.
   const systemTops = useRef<number[]>([])
@@ -76,9 +104,50 @@ export default function App() {
 
   useEffect(() => {
     if (!selected || !api) return
-    void loadFile(selected.file)
+    if (selected.imported) {
+      const bytes = getBytes(selected.id)
+      if (bytes) loadBytes(bytes)
+    } else {
+      void loadFile(selected.file)
+    }
     viewportRef.current?.scrollTo({ top: 0 })
-  }, [selected, api, loadFile])
+  }, [selected, api, loadFile, loadBytes, getBytes])
+
+  // Importing selects the last file added, so it shows up straight away.
+  const handleImport = useCallback(
+    async (files: Iterable<File>) => {
+      const ids = await importFiles(files)
+      const last = ids.at(-1)
+      if (last) setSelectedId(last)
+    },
+    [importFiles],
+  )
+
+  const openImportDialog = useCallback(() => fileInputRef.current?.click(), [])
+
+  // Drag-and-drop anywhere in the app. dragenter/dragleave fire for every
+  // child crossed, so a depth counter tells a real leave from a nested one.
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files')
+  const onDragEnter = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return
+    e.preventDefault()
+    setDragDepth((d) => d + 1)
+  }
+  const onDragOver = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return
+    setDragDepth((d) => Math.max(0, d - 1))
+  }
+  const onDrop = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return
+    e.preventDefault()
+    setDragDepth(0)
+    void handleImport(Array.from(e.dataTransfer.files))
+  }
 
   const changeTracks = useCallback(
     (next: Set<number>) => {
@@ -142,12 +211,12 @@ export default function App() {
 
   const goToPiece = useCallback(
     (offset: 1 | -1) => {
-      if (tabs.length === 0) return
+      if (allTabs.length === 0) return
       const base = selectedIndex >= 0 ? selectedIndex : 0
-      const next = (base + offset + tabs.length) % tabs.length
-      setSelectedId(tabs[next].id)
+      const next = (base + offset + allTabs.length) % allTabs.length
+      setSelectedId(allTabs[next].id)
     },
-    [selectedIndex],
+    [allTabs, selectedIndex],
   )
 
   const overlayOpen = paletteOpen || helpOpen
@@ -229,6 +298,13 @@ export default function App() {
         description: 'Open search palette',
         group: 'Collection',
         run: () => setPaletteOpen(true),
+      },
+      {
+        keys: ['i'],
+        label: 'i',
+        description: 'Import Guitar Pro files',
+        group: 'Collection',
+        run: openImportDialog,
       },
 
       {
@@ -355,6 +431,7 @@ export default function App() {
     [
       step,
       goToPiece,
+      openImportDialog,
       toggleFullscreen,
       cycleLayout,
       toggleTracks,
@@ -375,7 +452,37 @@ export default function App() {
   useHotkeys(shortcuts, overlayOpen)
 
   return (
-    <div ref={shellRef} className="flex h-screen w-screen flex-col overflow-hidden bg-white">
+    <div
+      ref={shellRef}
+      className="relative flex h-screen w-screen flex-col overflow-hidden bg-white"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={IMPORT_ACCEPT}
+        multiple
+        hidden
+        aria-hidden="true"
+        onChange={(e) => {
+          if (e.target.files) void handleImport(Array.from(e.target.files))
+          // Reset so picking the same file again still fires onChange.
+          e.target.value = ''
+        }}
+      />
+
+      {dragDepth > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-white/80 p-6">
+          <div className="rounded-xl border-2 border-dashed border-neutral-400 px-10 py-8 text-center">
+            <p className="text-base font-medium text-neutral-900">Drop to import</p>
+            <p className="mt-1 text-sm text-neutral-500">Guitar Pro files ({IMPORT_ACCEPT})</p>
+          </div>
+        </div>
+      )}
+
       <Toolbar
         tab={selected}
         tracks={score?.tracks ?? []}
@@ -402,21 +509,29 @@ export default function App() {
         onToggleFullscreen={toggleFullscreen}
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenHelp={() => setHelpOpen(true)}
+        onImport={openImportDialog}
       />
 
       <div className="flex min-h-0 flex-1">
-        {sidebarOpen && <TabSidebar tabs={tabs} selectedId={selectedId} onSelect={setSelectedId} />}
+        {sidebarOpen && (
+          <TabSidebar
+            tabs={allTabs}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onRemove={(id) => void removeImported(id)}
+          />
+        )}
         <ScoreView
           viewportRef={viewportRef}
           canvasRef={canvasRef}
           isLoading={isLoading}
-          error={error}
+          error={error ?? importError}
           cursorVisible={cursorVisible}
         />
       </div>
 
       <TabCommandPalette
-        tabs={tabs}
+        tabs={allTabs}
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         onSelect={setSelectedId}
