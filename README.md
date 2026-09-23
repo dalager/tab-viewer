@@ -38,18 +38,8 @@ The tabs live in the repo:
 collection/
 ├── index.csv                one row per piece
 ├── sources.csv              download URLs, git-ignored
-├── tabs/                    the .gp3 / .gp4 / .gp5 files
-└── multi-instrument-tabs/   pieces with more than one track, same layout
-    ├── index.csv
-    ├── sources.csv
-    └── tabs/
+└── tabs/                    the .gp3 / .gp4 / .gp5 files
 ```
-
-Only `collection/tabs/` is served by the app. `multi-instrument-tabs/` holds
-the files written for several tracks (guitar duets, organ scores, piano
-left/right hand, ensembles) that were set aside because they are not solo
-guitar pieces. It is not built or deployed; move a row and its file back into
-the top-level `index.csv` and `tabs/` to include one.
 
 `index.csv` has these columns:
 
