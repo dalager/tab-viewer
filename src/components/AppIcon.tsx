@@ -1,0 +1,30 @@
+interface AppIconProps {
+  className?: string
+}
+
+/**
+ * The app's mark: a winking eighth note cut out of a guitar pick. Same
+ * drawing as public/favicon.svg; the pick takes the text colour.
+ */
+export function AppIcon({ className }: AppIconProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M32 4C46 4 58 8 59 18C60 30 45 50 35 59C33.3 60.6 30.7 60.6 29 59C19 50 4 30 5 18C6 8 18 4 32 4Z"
+      />
+      <g transform="translate(14 5) scale(0.6)">
+        <ellipse fill="#fff" cx="22" cy="47" rx="12.5" ry="9.5" transform="rotate(-22 22 47)" />
+        <rect fill="#fff" x="30.5" y="9" width="5" height="38" rx="2.5" />
+        <path fill="#fff" d="M33 9C44 10 54 17 51 29C50 33 46 35 43 33C47 30 47 24 42 21C39 19 35 19 33 20Z" />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3.4"
+          strokeLinecap="round"
+          d="M15.5 46q3.2-3.4 6.6-.6"
+        />
+      </g>
+    </svg>
+  )
+}

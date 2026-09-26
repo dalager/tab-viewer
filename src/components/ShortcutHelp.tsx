@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/AppIcon'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,10 @@ export function ShortcutHelp({ shortcuts, open, onOpenChange }: ShortcutHelpProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <AppIcon className="size-6 text-neutral-900" />
+            Keyboard shortcuts
+          </DialogTitle>
           <DialogDescription>Press ? to close.</DialogDescription>
         </DialogHeader>
 

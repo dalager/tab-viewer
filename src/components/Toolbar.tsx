@@ -1,4 +1,5 @@
 import type * as alphaTab from '@coderline/alphatab'
+import { AppIcon } from '@/components/AppIcon'
 import { SpeedControl } from '@/components/SpeedControl'
 import { TrackPicker } from '@/components/TrackPicker'
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,8 @@ export function Toolbar(props: ToolbarProps) {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3">
+      <AppIcon className="size-7 shrink-0 text-neutral-900" />
+
       <Button variant="ghost" size="sm" onClick={props.onToggleSidebar} title="Toggle sidebar (b)">
         {props.sidebarOpen ? 'Hide list' : 'Show list'}
       </Button>
