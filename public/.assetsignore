@@ -1,3 +1,4 @@
-# The full soundfont is 40 MB, over the 25 MiB per-file asset limit. Deployed
-# builds load it from R2 via VITE_SOUNDFONT_URL instead (see README).
+# The full soundfont is 40 MB, over Cloudflare's 25 MiB per-file limit, so it
+# is left out of Workers deploys. Point VITE_SOUNDFONT_URL at a hosted copy,
+# or at the small bundled bank (/soundfont/sonivox.sf3); see the README.
 soundfont/default.sf3

@@ -53,8 +53,8 @@ export function buildSettings(viewport: HTMLElement | null): alphaTab.json.Setti
     },
     player: {
       playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
-      // Locally: fetched by scripts/fetch-soundfont.mjs. In production: a
-      // hosted copy, since the file is too large for Cloudflare Pages.
+      // Fetched by scripts/fetch-soundfont.mjs. Hosts with a per-file size
+      // limit (Cloudflare) point VITE_SOUNDFONT_URL elsewhere; see the README.
       soundFont: import.meta.env.VITE_SOUNDFONT_URL || '/soundfont/default.sf3',
       // The scroll container, so the playback cursor keeps itself in view.
       ...(viewport ? { scrollElement: viewport } : {}),

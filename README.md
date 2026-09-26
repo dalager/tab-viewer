@@ -4,8 +4,10 @@ A browser-based reader and player for Guitar Pro tablature, built on
 [alphaTab](https://www.alphatab.net/), React and Vite. Made for reading Bach at
 the guitar: page through a score with the keyboard, play it back at reduced
 speed on a nylon-string sound, and star the pieces you are working on. Pieces
-come from *songbooks*, JSON manifests that can be hosted anywhere. It runs at
-<https://tabviewer.dalagerlabs.com>.
+come from *songbooks*, JSON manifests that can be hosted anywhere.
+
+Try it at <https://tabviewer.dalagerlabs.com>, or deploy your own copy (see
+[Deploying](#deploying)).
 
 ## Starting the app
 
@@ -24,7 +26,7 @@ Then open http://localhost:5173/. Node.js 20 or newer is required.
   one time) into `public/soundfont/`. Playback uses it instead of alphaTab's
   bundled feature-phone bank. If the download fails, it falls back to the
   bundled bank so playback still works offline. Skipped when
-  `VITE_SOUNDFONT_URL` is set (see Deployment).
+  `VITE_SOUNDFONT_URL` is set (see [Deploying](#deploying)).
 
 `public/songbooks/` and `public/soundfont/` are generated and git-ignored.
 
@@ -102,6 +104,15 @@ zip -r -X ../songbooks/bach-for-guitar.sbk songbook.json tabs
 Keep each song's `id` when editing: it is the stem of links like `/p/air`,
 and it is what favourites are stored by.
 
+### About the transcriptions
+
+The Guitar Pro files in the bundled book are community transcriptions gathered
+from public tab sites. J. S. Bach's compositions are in the public domain, but
+a transcription or arrangement can belong to whoever made it. The files are
+included for personal study and are **not** covered by this project's MIT
+license (see [LICENSE](LICENSE)). If you made one of them and want it credited
+or removed, please open an issue.
+
 ## Using it
 
 Press `?` in the app for the full list of keyboard shortcuts. The essentials:
@@ -146,34 +157,67 @@ survive reloads but never leave your machine, and are listed under *Imported*
 at the top of the sidebar with a button to remove them again. The title and
 artist come from the file's own metadata, falling back to the file name.
 
-## Deployment
+## Deploying
 
-`.github/workflows/deploy.yml` builds on every push to `main` and deploys
-`dist/` as a static-assets Worker (`wrangler.jsonc`) with Wrangler. It is
-served at <https://tabviewer.dalagerlabs.com> (a Workers Custom Domain; the
-workers.dev URL is disabled). Unknown paths fall back to `index.html`, so
-deep links like `/p/<piece>` resolve. To deploy by hand, build with
-`VITE_SOUNDFONT_URL` set and run `npx wrangler deploy`.
+TabViewer is a static site: `npm run build` writes everything to `dist/`, and
+any static host can serve it. Two things matter on every host:
 
-The soundfont is not deployed with the site: Workers static assets reject
-files over 25 MiB and `MuseScore_General.sf3` is 40 MB, so
-`public/.assetsignore` excludes it. Instead the build points the player at a
-hosted copy in the R2 bucket `tab-viewer-soundfont` via `VITE_SOUNDFONT_URL`.
-One-time setup (already done for the bucket and Worker):
+- **Deep links.** Paths like `/p/<piece>` are handled by the app, so the host
+  must answer unknown paths with `index.html`. The app also expects to live at
+  the root of its domain, not under a sub-path.
+- **The soundfont.** Playback uses a 40 MB soundfont
+  (`dist/soundfont/default.sf3`). On a host with a per-file size limit
+  (Cloudflare allows 25 MiB), set `VITE_SOUNDFONT_URL` when building: either
+  to a copy hosted elsewhere (it is fetched cross-origin, so its server must
+  allow `GET` from your site via CORS), or to `/soundfont/sonivox.sf3`,
+  alphaTab's small built-in bank (1 MB, noticeably thinner sound).
 
-1. Create an R2 bucket, upload `MuseScore_General.sf3` (the file
-   `npm run soundfont` saves as `public/soundfont/default.sf3`), and enable
-   public access on the bucket (or attach a custom domain).
-2. Add a CORS rule to the bucket allowing `GET` from the site's origin.
-   The player fetches the font cross-origin, so without this it fails to
-   load.
-3. In the GitHub repo, under *Settings → Secrets and variables → Actions*:
-   - Variable `SOUNDFONT_URL`: the public URL of the `.sf3` file.
-   - Secret `CLOUDFLARE_API_TOKEN`: a token made from the *Edit Cloudflare
-     Workers* template.
-   - Secret `CLOUDFLARE_ACCOUNT_ID`.
+To ship your own songbooks, put `.sbk` files in `songbooks/` and list them in
+`SUGGESTED_SONGBOOKS` in `src/lib/songbook.ts`; the first entry is the one a
+first visit opens.
 
-Wrangler creates the `tab-viewer` Worker on first deploy.
+### Netlify or Vercel
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/dalager/tab-viewer)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/dalager/tab-viewer)
+
+Both read their settings from the repo (`netlify.toml`, `vercel.json`): build
+command, output directory and the `index.html` fallback. The full soundfont is
+deployed as is.
+
+### Cloudflare Workers
+
+`wrangler.jsonc` deploys `dist/` as a static-assets Worker, served at
+`tab-viewer.<your-account>.workers.dev`:
+
+```sh
+VITE_SOUNDFONT_URL=/soundfont/sonivox.sf3 npm run build
+npx wrangler deploy
+```
+
+To deploy from GitHub on every push to `main`, fork the repo and, under
+*Settings → Secrets and variables → Actions*, add:
+
+- Secret `CLOUDFLARE_API_TOKEN` (made from the *Edit Cloudflare Workers*
+  template) and secret `CLOUDFLARE_ACCOUNT_ID`.
+- Variable `CLOUDFLARE_DEPLOY` set to `true`.
+- Optionally, variable `SOUNDFONT_URL` for a hosted full soundfont (without
+  it the workflow builds with the small bundled bank), and variable
+  `DEPLOY_DOMAIN` to serve the Worker on a custom domain in the same Cloudflare
+  account instead of workers.dev.
+
+Without `CLOUDFLARE_DEPLOY`, the workflow only lints and builds, which also
+runs on pull requests.
+
+### Any other static server
+
+Serve `dist/` with a fallback to `index.html`, for example:
+
+```sh
+npx serve -s dist
+```
+
+or, with nginx, `try_files $uri /index.html;` in the site's `location /`.
 
 ## Other scripts
 

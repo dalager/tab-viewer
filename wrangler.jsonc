@@ -8,9 +8,8 @@
     // Deep links like /p/<piece> are client-side routes: serve index.html.
     "not_found_handling": "single-page-application"
   },
-  // Served only on the custom domain below.
-  "workers_dev": false,
-  "routes": [
-    { "pattern": "tabviewer.dalagerlabs.com", "custom_domain": true }
-  ]
+  // Served at <name>.<account>.workers.dev. To use your own domain instead,
+  // deploy with `--domain your.domain` (the GitHub workflow does this when
+  // the DEPLOY_DOMAIN variable is set) and set this to false.
+  "workers_dev": true
 }

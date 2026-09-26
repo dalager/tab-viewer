@@ -1,16 +1,22 @@
-name: Deploy to Cloudflare Workers
+name: Build and deploy
+
+# Every push and pull request is linted and built. Deploying to Cloudflare
+# Workers is opt-in, so forks stay green: set the repository variable
+# CLOUDFLARE_DEPLOY to "true" and add the CLOUDFLARE_API_TOKEN and
+# CLOUDFLARE_ACCOUNT_ID secrets. See "Deploying" in the README.
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,14 +30,31 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run lint
+
+      # The 40 MB soundfont is over Cloudflare's 25 MiB per-file limit, so
+      # playback uses SOUNDFONT_URL (a hosted copy) or else the small bank
+      # alphaTab ships with.
       - run: npm run build
         env:
-          VITE_SOUNDFONT_URL: ${{ vars.SOUNDFONT_URL }}
+          VITE_SOUNDFONT_URL: ${{ vars.SOUNDFONT_URL || '/soundfont/sonivox.sf3' }}
 
-      - uses: cloudflare/wrangler-action@v4
+      # DEPLOY_DOMAIN (optional) serves the Worker on that custom domain and
+      # turns off its workers.dev URL.
+      - name: Use custom domain
+        if: vars.DEPLOY_DOMAIN != ''
+        run: |
+          sed -i 's/"workers_dev": true/"workers_dev": false/' wrangler.jsonc
+
+      - name: Deploy
+        if: >-
+          vars.CLOUDFLARE_DEPLOY == 'true' &&
+          github.ref == 'refs/heads/main' &&
+          github.event_name != 'pull_request'
+        uses: cloudflare/wrangler-action@v4
         with:
           # Pinned so deploys are reproducible; keep in step with local Wrangler.
           wranglerVersion: '4.137.0'
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy${{ vars.DEPLOY_DOMAIN != '' && format(' --domain {0}', vars.DEPLOY_DOMAIN) || '' }}
