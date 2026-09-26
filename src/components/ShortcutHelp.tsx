@@ -13,6 +13,8 @@ interface ShortcutHelpProps {
   onOpenChange: (open: boolean) => void
 }
 
+const REPO_URL = 'https://github.com/dalager/tab-viewer'
+
 /** Renders the same SHORTCUTS array the handler uses, so the two cannot drift. */
 export function ShortcutHelp({ shortcuts, open, onOpenChange }: ShortcutHelpProps) {
   const groups = shortcuts.reduce<Record<string, Shortcut[]>>((acc, s) => {
@@ -48,6 +50,21 @@ export function ShortcutHelp({ shortcuts, open, onOpenChange }: ShortcutHelpProp
               </dl>
             </section>
           ))}
+        </div>
+
+        <div className="flex justify-end border-t border-neutral-200 pt-3">
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="Source on GitHub"
+            aria-label="Source on GitHub"
+            className="rounded p-1 text-neutral-500 hover:text-neutral-900"
+          >
+            <svg viewBox="0 0 19 19" className="size-5" aria-hidden="true">
+              <use href="/icons.svg#github-icon" />
+            </svg>
+          </a>
         </div>
       </DialogContent>
     </Dialog>
