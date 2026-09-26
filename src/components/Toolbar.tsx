@@ -34,6 +34,9 @@ interface ToolbarProps {
   onOpenPalette: () => void
   onOpenHelp: () => void
   onImport: () => void
+  /** Name of the loaded songbook, or null when none is. */
+  bookName: string | null
+  onOpenSongbooks: () => void
   linkCopied: boolean
   onCopyLink: () => void
 }
@@ -61,6 +64,16 @@ export function Toolbar(props: ToolbarProps) {
           </p>
         )}
       </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={props.onOpenSongbooks}
+        title="Load, switch or unload a songbook (o)"
+        className="max-w-48"
+      >
+        <span className="truncate">{props.bookName ?? 'Songbook'}</span>
+      </Button>
 
       <Button variant="ghost" size="sm" onClick={props.onOpenPalette} title="Search (Ctrl+K)">
         Search

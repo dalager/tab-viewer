@@ -1,7 +1,9 @@
-// Builds the tab manifest consumed by the app.
+// Builds the bundled "Bach Guitar Songbook".
 //
-// Reads the scraped CSV index, copies every Guitar Pro file into public/tabs/
-// under an ASCII slug name, and emits src/data/tabs.json.
+// Reads the scraped CSV index, copies every Guitar Pro file into
+// public/songbooks/bach/tabs/ under an ASCII slug name, and emits
+// public/songbooks/bach/songbook.json. The app loads it like any other
+// songbook URL; nothing about the collection is compiled into the bundle.
 //
 // Run via the `predev` / `prebuild` npm scripts so it always precedes Vite.
 
@@ -16,8 +18,10 @@ const appRoot = path.resolve(here, '..')
 
 const CSV = path.join(appRoot, 'collection', 'index.csv')
 const SRC_DIR = path.join(appRoot, 'collection', 'tabs')
-const OUT_DIR = path.join(appRoot, 'public', 'tabs')
-const MANIFEST = path.join(appRoot, 'src', 'data', 'tabs.json')
+const BOOK_DIR = path.join(appRoot, 'public', 'songbooks', 'bach')
+const OUT_DIR = path.join(BOOK_DIR, 'tabs')
+const MANIFEST = path.join(BOOK_DIR, 'songbook.json')
+const BOOK_NAME = 'Bach Guitar Songbook'
 
 /** ASCII slug: "Suite Nº1" -> "suite-no1". Keeps URLs free of encoding. */
 function slugify(value) {
@@ -84,15 +88,16 @@ for (const row of rows) {
     copied++
   }
 
-  entries.push({
+  const entry = {
     id,
     title,
-    artist: row.artist?.trim() ?? 'Bach',
-    songId: row.song_id?.trim() ?? '',
-    ext,
-    file: `/tabs/${id}.${ext}`,
-    sourceUrl: row.url?.trim() ?? '',
-  })
+    artist: row.artist?.trim() || 'Bach',
+    // Relative to songbook.json, so the folder can be hosted anywhere.
+    url: `tabs/${id}.${ext}`,
+  }
+  const sourceUrl = row.url?.trim()
+  if (sourceUrl) entry.sourceUrl = sourceUrl
+  entries.push(entry)
 }
 
 // Drift in either direction is a real problem: fail loudly rather than
@@ -103,8 +108,9 @@ if (orphaned.length > 0) {
 }
 
 entries.sort((a, b) => a.title.localeCompare(b.title))
-fs.writeFileSync(MANIFEST, `${JSON.stringify(entries, null, 2)}\n`)
+const songbook = { songbook: 1, name: BOOK_NAME, songs: entries }
+fs.writeFileSync(MANIFEST, `${JSON.stringify(songbook, null, 2)}\n`)
 
 console.log(
-  `build-manifest: ${entries.length} tabs (${copied} copied, ${skipped} unchanged) -> public/tabs/`,
+  `build-manifest: ${entries.length} tabs (${copied} copied, ${skipped} unchanged) -> public/songbooks/bach/`,
 )

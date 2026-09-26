@@ -2,15 +2,17 @@ import * as alphaTab from '@coderline/alphatab'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ScoreView } from '@/components/ScoreView'
 import { ShortcutHelp } from '@/components/ShortcutHelp'
+import { SongbookDialog, SongbookPicker } from '@/components/SongbookDialog'
 import { TabCommandPalette } from '@/components/TabCommandPalette'
 import { TabSidebar } from '@/components/TabSidebar'
 import { Toolbar } from '@/components/Toolbar'
-import { tabs } from '@/data/tabs'
 import { useAlphaTab } from '@/hooks/useAlphaTab'
 import { useFullscreen } from '@/hooks/useFullscreen'
 import { type Shortcut, useHotkeys } from '@/hooks/useHotkeys'
 import { IMPORT_ACCEPT, useImportedTabs } from '@/hooks/useImportedTabs'
+import { useSongbooks } from '@/hooks/useSongbooks'
 import { parseLocation, piecePath, pieceUrl } from '@/lib/permalink'
+import type { Songbook } from '@/lib/songbook'
 import { computeSystemTops, pageBy, scrollToEdge, topVisibleBar } from '@/score/paging'
 import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
 
@@ -34,12 +36,13 @@ export default function App() {
   const canvasRef = useRef<HTMLDivElement>(null)
 
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => parseLocation().id ?? localStorage.getItem(STORAGE_KEY) ?? tabs[0]?.id ?? null,
+    () => parseLocation().id ?? localStorage.getItem(STORAGE_KEY),
   )
   const pendingBar = useRef<PendingBar | null>(pendingBarFrom(window.location))
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [songbooksOpen, setSongbooksOpen] = useState(false)
   // Empty set means "render every track".
   const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set())
   const [scale, setScale] = useState(1)
@@ -56,8 +59,11 @@ export default function App() {
     getBytes,
   } = useImportedTabs()
 
+  const songbooks = useSongbooks()
+  const { active: book, loading: bookLoading, load: loadBook } = songbooks
+
   // Imported pieces first, so they sit at the top of the sidebar.
-  const allTabs = useMemo(() => [...imported, ...tabs], [imported])
+  const allTabs = useMemo(() => [...imported, ...(book?.tabs ?? [])], [imported, book])
 
   const {
     api,
@@ -90,15 +96,24 @@ export default function App() {
     [allTabs, selectedId],
   )
   const selected = selectedIndex >= 0 ? allTabs[selectedIndex] : null
+  // Every piece that is not an import belongs to the one loaded songbook.
+  const selectedBook = selected && !selected.imported ? (book?.url ?? null) : null
 
-  // A remembered selection may point at an import that has since been removed
-  // (or one not yet read from IndexedDB). Once the imports are known, fall back
-  // to the first bundled piece rather than showing nothing. Adjusted during
-  // render, like tracksPiece below, so it settles in the same pass.
-  const fallbackId = tabs[0]?.id ?? null
-  if (importedReady && selectedIndex < 0 && selectedId !== fallbackId) {
+  // A remembered selection may point at an import that has since been removed,
+  // a piece in a songbook that was unloaded, or one not loaded yet. Once imports
+  // and the songbook have settled, fall back to the songbook's first piece (else
+  // the first import) rather than showing nothing. Adjusted during render, like tracksPiece below, so it
+  // settles in the same pass.
+  const fallbackId = book?.tabs[0]?.id ?? imported[0]?.id ?? null
+  const settled = importedReady && !bookLoading
+  if (settled && selectedIndex < 0 && selectedId !== fallbackId) {
     setSelectedId(fallbackId)
   }
+
+  // A freshly loaded songbook opens on its first piece.
+  const onBookLoaded = useCallback((loaded: Songbook) => {
+    setSelectedId(loaded.tabs[0]?.id ?? null)
+  }, [])
 
   // Cached staff-system boundaries, invalidated whenever a render completes.
   const systemTops = useRef<number[]>([])
@@ -128,22 +143,39 @@ export default function App() {
 
   // Keep the address bar a permalink to the open piece. Moving between known
   // pieces adds history entries; landing on "/" or on a slug that no longer
-  // exists is corrected in place instead, so Back does not return to it.
+  // exists is corrected in place instead, so Back does not return to it. With
+  // nothing open (no songbook, no imports) the address goes back to "/".
   useEffect(() => {
-    if (!selectedId) return
-    const target = piecePath(selectedId)
-    if (window.location.pathname === target) return
-    const current = parseLocation().id
-    const known = current !== null && allTabs.some((t) => t.id === current)
+    if (!settled) return
+    if (!selected) {
+      if (window.location.pathname !== '/') window.history.replaceState(null, '', '/')
+      return
+    }
+    const current = parseLocation()
+    if (current.id === selected.id && current.book === selectedBook) return
+    const target = piecePath(selected.id, null, selectedBook)
+    const known = current.id !== null && allTabs.some((t) => t.id === current.id)
     if (known) window.history.pushState(null, '', target)
     else window.history.replaceState(null, '', target)
-  }, [selectedId, allTabs])
+  }, [settled, selected, selectedBook, allTabs])
+
+  // Back/Forward into another songbook's piece has to load that book first.
+  const bookUrlRef = useRef(book?.url ?? null)
+  useEffect(() => {
+    bookUrlRef.current = book?.url ?? null
+  }, [book])
 
   useEffect(() => {
     const onPopState = () => {
-      const { id } = parseLocation()
+      const { id, book: linkedBook } = parseLocation()
       if (!id) return
       const pending = pendingBarFrom(window.location)
+      if (linkedBook && linkedBook !== bookUrlRef.current) {
+        pendingBar.current = pending
+        setSelectedId(id)
+        void loadBook(linkedBook)
+        return
+      }
       if (id === selectedIdRef.current) {
         // Same piece, already rendered: nothing will re-render, so jump now.
         pendingBar.current = null
@@ -155,7 +187,7 @@ export default function App() {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [seekToBar])
+  }, [seekToBar, loadBook])
 
   // A new piece starts with every track shown again. Adjusting during render
   // rather than inside the load effect avoids a cascading second render.
@@ -294,17 +326,17 @@ export default function App() {
   const copyLink = useCallback(async () => {
     if (!selected || selected.imported) return
     const bar = (currentBar() ?? topVisibleBar(api, viewportRef.current, layoutMode)) + 1
-    window.history.replaceState(null, '', piecePath(selected.id, bar))
+    window.history.replaceState(null, '', piecePath(selected.id, bar, selectedBook))
     try {
-      await navigator.clipboard.writeText(pieceUrl(selected.id, bar))
+      await navigator.clipboard.writeText(pieceUrl(selected.id, bar, selectedBook))
       setLinkCopied(true)
     } catch {
       // Clipboard can be refused (permissions, insecure context); the address
       // bar already holds the link, so there is still something to copy.
     }
-  }, [selected, currentBar, api, layoutMode])
+  }, [selected, selectedBook, currentBar, api, layoutMode])
 
-  const overlayOpen = paletteOpen || helpOpen
+  const overlayOpen = paletteOpen || helpOpen || songbooksOpen
 
   const shortcuts = useMemo<Shortcut[]>(
     () => [
@@ -390,6 +422,13 @@ export default function App() {
         description: 'Copy link to current bar',
         group: 'Collection',
         run: () => void copyLink(),
+      },
+      {
+        keys: ['o'],
+        label: 'o',
+        description: 'Open songbook',
+        group: 'Collection',
+        run: () => setSongbooksOpen(true),
       },
       {
         keys: ['i'],
@@ -516,6 +555,7 @@ export default function App() {
         run: () => {
           if (helpOpen) setHelpOpen(false)
           else if (paletteOpen) setPaletteOpen(false)
+          else if (songbooksOpen) setSongbooksOpen(false)
           else void exitFullscreen()
         },
       },
@@ -533,6 +573,7 @@ export default function App() {
       exitFullscreen,
       helpOpen,
       paletteOpen,
+      songbooksOpen,
       playPause,
       stop,
       toggleMetronome,
@@ -603,14 +644,17 @@ export default function App() {
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenHelp={() => setHelpOpen(true)}
         onImport={openImportDialog}
+        bookName={book?.name ?? null}
+        onOpenSongbooks={() => setSongbooksOpen(true)}
         linkCopied={linkCopied}
         onCopyLink={() => void copyLink()}
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         {sidebarOpen && (
           <TabSidebar
             tabs={allTabs}
+            bookName={book?.name ?? null}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onRemove={(id) => void removeImported(id)}
@@ -623,6 +667,18 @@ export default function App() {
           error={error ?? importError}
           cursorVisible={cursorVisible}
         />
+        {settled && allTabs.length === 0 && (
+          <div className="absolute inset-0 z-20 flex items-start justify-center overflow-y-auto bg-white p-6 sm:pt-16">
+            <div className="w-full max-w-lg">
+              <h2 className="text-lg font-semibold text-neutral-900">Load a songbook</h2>
+              <p className="mt-1 mb-6 text-sm text-neutral-500">
+                Paste the URL of a songbook, pick one below, or drop Guitar Pro files anywhere
+                to import them.
+              </p>
+              <SongbookPicker songbooks={songbooks} onLoaded={onBookLoaded} />
+            </div>
+          </div>
+        )}
       </div>
 
       <TabCommandPalette
@@ -630,6 +686,12 @@ export default function App() {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         onSelect={setSelectedId}
+      />
+      <SongbookDialog
+        songbooks={songbooks}
+        open={songbooksOpen}
+        onOpenChange={setSongbooksOpen}
+        onLoaded={onBookLoaded}
       />
       <ShortcutHelp shortcuts={shortcuts} open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

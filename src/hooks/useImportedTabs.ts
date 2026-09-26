@@ -6,6 +6,7 @@ import {
   listImported,
   putImported,
 } from '@/lib/importedTabs'
+import { errorMessage } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
 /** Formats alphaTab can open. gp3-5 are binary, gpx/gp are zipped XML. */
@@ -33,10 +34,8 @@ function toEntry(record: ImportedRecord): TabEntry {
     id: record.id,
     title: record.title,
     artist: record.artist,
-    songId: '',
     ext: record.ext,
     file: '',
-    sourceUrl: '',
     imported: true,
   }
 }
@@ -76,7 +75,7 @@ async function toRecord(file: File): Promise<ImportedRecord> {
   try {
     meta = readMetadata(bytes)
   } catch (e) {
-    const reason = e instanceof Error ? e.message : String(e)
+    const reason = errorMessage(e)
     throw new Error(`${file.name}: could not be read (${reason})`)
   }
   return {
@@ -111,7 +110,7 @@ export function useImportedTabs(): UseImportedTabs {
         setImported(records.map(toEntry))
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) setError(errorMessage(e))
       })
       .finally(() => {
         if (!cancelled) setReady(true)
@@ -132,7 +131,7 @@ export function useImportedTabs(): UseImportedTabs {
         bytesRef.current.set(record.id, record.bytes)
         added.push(toEntry(record))
       } catch (e) {
-        failures.push(e instanceof Error ? e.message : String(e))
+        failures.push(errorMessage(e))
       }
     }
 
@@ -145,7 +144,7 @@ export function useImportedTabs(): UseImportedTabs {
     try {
       await deleteImported(id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errorMessage(e))
       return
     }
     bytesRef.current.delete(id)

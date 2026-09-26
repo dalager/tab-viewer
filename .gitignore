@@ -28,8 +28,7 @@ dist-ssr
 # and scripts/build-manifest.mjs generates the rest. ~7.5 MB of binaries.
 public/font
 public/soundfont
-public/tabs
-src/data/tabs.json
+public/songbooks
 
 # Scrape sources (download URLs) stay local; only index.csv is committed.
 collection/sources.csv

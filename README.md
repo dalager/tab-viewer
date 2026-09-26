@@ -1,10 +1,11 @@
 # TabViewer
 
-A browser-based reader and player for a collection of Guitar Pro tablature,
-built on [alphaTab](https://www.alphatab.net/), React and Vite. Made for
-reading Bach at the guitar: page through a score with the keyboard, play it
-back at reduced speed on a nylon-string sound, and star the pieces you are
-working on. It runs at <https://tabviewer.dalagerlabs.com>.
+A browser-based reader and player for Guitar Pro tablature, built on
+[alphaTab](https://www.alphatab.net/), React and Vite. Made for reading Bach at
+the guitar: page through a score with the keyboard, play it back at reduced
+speed on a nylon-string sound, and star the pieces you are working on. Pieces
+come from *songbooks*, JSON manifests that can be hosted anywhere. It runs at
+<https://tabviewer.dalagerlabs.com>.
 
 ## Starting the app
 
@@ -17,22 +18,50 @@ Then open http://localhost:5173/. Node.js 20 or newer is required.
 
 `npm run dev` (and `npm run build`) first run two preparation scripts:
 
-- **`npm run manifest`** copies every file from `collection/tabs/` into
-  `public/tabs/` under an ASCII slug name and writes `src/data/tabs.json`,
-  which is the list the app renders. Reruns are instant; only changed files
-  are copied.
+- **`npm run manifest`** builds the bundled *Bach Guitar Songbook*: it copies
+  every file from `collection/tabs/` into `public/songbooks/bach/tabs/` under
+  an ASCII slug name and writes `public/songbooks/bach/songbook.json`. Reruns
+  are instant; only changed files are copied.
 - **`npm run soundfont`** downloads the MuseScore_General soundfont (~40 MB,
   one time) into `public/soundfont/`. Playback uses it instead of alphaTab's
   bundled feature-phone bank. If the download fails, it falls back to the
   bundled bank so playback still works offline. Skipped when
   `VITE_SOUNDFONT_URL` is set (see Deployment).
 
-`public/tabs/`, `public/soundfont/` and `src/data/tabs.json` are generated
-and git-ignored.
+`public/songbooks/` and `public/soundfont/` are generated and git-ignored.
 
-## The collection
+## Songbooks
 
-The tabs live in the repo:
+The app ships without any pieces compiled in. A songbook is a JSON file at any
+URL that lists Guitar Pro files:
+
+```json
+{
+  "songbook": 1,
+  "name": "Bach Guitar Songbook",
+  "description": "optional",
+  "songs": [
+    { "url": "tabs/air.gp5", "title": "Air", "artist": "Bach", "id": "air" }
+  ]
+}
+```
+
+Only `url` is required per song. It resolves against the manifest's own URL,
+so a folder holding `songbook.json` and its files is a complete songbook.
+`title` falls back to the file name and `id` (used in links) to a slug of it.
+A songbook on another host must be served with CORS headers that allow `GET`
+from the viewer's origin.
+
+A first visit starts empty. Press `o` or click *Songbook* in the toolbar to
+paste a URL or pick the bundled *Bach Guitar Songbook*. One songbook is loaded
+at a time; the loaded one and every one loaded before are remembered in
+`localStorage`, and can be switched between, unloaded, forgotten or cleared
+from the same dialog. The bundled book is listed in `SUGGESTED_SONGBOOKS` in
+`src/lib/songbook.ts`.
+
+## The bundled collection
+
+The tabs for the bundled songbook live in the repo:
 
 ```
 collection/
@@ -72,7 +101,8 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 | --- | --- |
 | `PageDown` / `PageUp`, `j` / `k` | Page or half-page through the score |
 | `n` / `p` | Next / previous piece |
-| `/` or `Ctrl+K` | Search the collection |
+| `/` or `Ctrl+K` | Search the songbook |
+| `o` | Load, switch or unload a songbook |
 | `c` | Copy a link to the current bar |
 | `Space`, `s` | Play / pause, stop |
 | `,` / `.` / `\` | Slower / faster / reset to 100% |
@@ -89,8 +119,11 @@ the last-opened piece are stored in the browser's `localStorage`.
 ### Links to pieces and bars
 
 The address bar always holds a permanent link to the open piece, at
-`/p/<piece>`. Adding `?bar=<n>` opens the piece scrolled to that bar, with the
-playback cursor parked on it; bar numbers are the ones printed in the score.
+`/p/<piece>?book=<songbook url>`. Opening it loads that songbook first, so
+links work for visitors who have never loaded it. Without `book`, the piece is
+looked up in whichever songbook is loaded. Adding `bar=<n>` opens the piece
+scrolled to that bar, with the playback cursor parked on it; bar numbers are
+the ones printed in the score.
 *Copy link* in the toolbar (or `c`) copies a link to the bar under the
 playback cursor, or else the first bar in view.
 
@@ -98,7 +131,7 @@ playback cursor, or else the first bar in view.
 
 Press `i`, click *Import* in the toolbar, or drop `.gp3` / `.gp4` / `.gp5` /
 `.gpx` / `.gp` files anywhere in the window to add pieces that are not part of
-the deployed collection. They are stored in the browser's IndexedDB, so they
+any songbook. They are stored in the browser's IndexedDB, so they
 survive reloads but never leave your machine, and are listed under *Imported*
 at the top of the sidebar with a button to remove them again. The title and
 artist come from the file's own metadata, falling back to the file name.

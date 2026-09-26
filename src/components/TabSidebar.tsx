@@ -8,6 +8,8 @@ import type { TabEntry } from '@/types'
 
 interface TabSidebarProps {
   tabs: TabEntry[]
+  /** Heading for the songbook's pieces; falls back to "Songbook". */
+  bookName: string | null
   selectedId: string | null
   onSelect: (id: string) => void
   /** Called for pieces with `imported` set; they get a remove button. */
@@ -18,11 +20,16 @@ interface TabSidebarProps {
  * Section label to show above row `i`, if it starts a new section. Labels are
  * only needed when there is more than one section.
  */
-function sectionHeading(shown: TabEntry[], i: number, labelled: boolean): string | null {
+function sectionHeading(
+  shown: TabEntry[],
+  i: number,
+  labelled: boolean,
+  bookLabel: string,
+): string | null {
   if (!labelled) return null
   const tab = shown[i]
-  if (i === 0) return tab.imported ? 'Imported' : 'Collection'
-  return shown[i - 1].imported && !tab.imported ? 'Collection' : null
+  if (i === 0) return tab.imported ? 'Imported' : bookLabel
+  return shown[i - 1].imported && !tab.imported ? bookLabel : null
 }
 
 function SectionHeading({ children }: { children: string }) {
@@ -36,7 +43,7 @@ function SectionHeading({ children }: { children: string }) {
 /** Rows rendered initially, and added each time the sentinel comes into view. */
 const PAGE_SIZE = 60
 
-export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarProps) {
+export function TabSidebar({ tabs, bookName, selectedId, onSelect, onRemove }: TabSidebarProps) {
   const [query, setQuery] = useState('')
   const hasImports = useMemo(() => tabs.some((t) => t.imported), [tabs])
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -163,7 +170,7 @@ export function TabSidebar({ tabs, selectedId, onSelect, onRemove }: TabSidebarP
           {starred.map((tab) => renderRow(tab, 'starred:'))}
 
           {shown.map((tab, i) => {
-            const heading = sectionHeading(shown, i, labelled)
+            const heading = sectionHeading(shown, i, labelled, bookName ?? 'Songbook')
             return heading ? (
               <Fragment key={tab.id}>
                 <li>

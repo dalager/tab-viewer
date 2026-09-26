@@ -1,5 +1,6 @@
 import * as alphaTab from '@coderline/alphatab'
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { errorMessage } from '@/lib/utils'
 import { buildSettings, MAX_SPEED, MIN_SPEED, NYLON_GUITAR_PROGRAM } from '@/score/settings'
 
 export interface UseAlphaTab {
@@ -153,7 +154,7 @@ export function useAlphaTab(
     const onPostRenderFinished = () => setRenderVersion((v) => v + 1)
     const onError = (e: unknown) => {
       setIsLoading(false)
-      setError(`Could not render this piece: ${e instanceof Error ? e.message : String(e)}`)
+      setError(`Could not render this piece: ${errorMessage(e)}`)
     }
     const onPlayerReady = () => setIsPlayerReady(true)
     const showCursor = (visible: boolean) => {
@@ -263,7 +264,7 @@ export function useAlphaTab(
       } catch (e) {
         if (token !== loadToken.current) return
         setIsLoading(false)
-        setError(`Could not load this piece: ${e instanceof Error ? e.message : String(e)}`)
+        setError(`Could not load this piece: ${errorMessage(e)}`)
       }
     },
     [beginLoad],
