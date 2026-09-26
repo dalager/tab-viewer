@@ -33,6 +33,8 @@ interface ToolbarProps {
   onOpenPalette: () => void
   onOpenHelp: () => void
   onImport: () => void
+  linkCopied: boolean
+  onCopyLink: () => void
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -68,6 +70,20 @@ export function Toolbar(props: ToolbarProps) {
         title="Import Guitar Pro files (i), or drop them anywhere"
       >
         Import
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={props.onCopyLink}
+        disabled={!tab || tab.imported}
+        title={
+          tab?.imported
+            ? 'Imported pieces live only in this browser, so they cannot be linked'
+            : 'Copy link to this bar (c)'
+        }
+      >
+        {props.linkCopied ? 'Copied' : 'Copy link'}
       </Button>
 
       <Separator orientation="vertical" className="h-6" />

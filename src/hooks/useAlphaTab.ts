@@ -7,7 +7,10 @@ export interface UseAlphaTab {
   score: alphaTab.model.Score | null
   isLoading: boolean
   error: string | null
-  /** Bumps on every renderFinished; paging uses it to invalidate cached bounds. */
+  /**
+   * Bumps once each render's bounds lookup is built (postRenderFinished, not
+   * renderFinished, which fires before it exists); paging and bar links read it.
+   */
   renderVersion: number
   loadFile: (url: string) => Promise<void>
   /** Load a file already in memory, e.g. one the user imported. */
@@ -31,6 +34,10 @@ export interface UseAlphaTab {
   playPause: () => void
   stop: () => void
   toggleMetronome: () => void
+  /** Park the playback cursor at the start of this master bar (0-based) and scroll to it. */
+  seekToBar: (index: number) => void
+  /** Master bar (0-based) under the playback cursor, or null while it is hidden. */
+  currentBar: () => number | null
 }
 
 /**
@@ -87,6 +94,36 @@ export function useAlphaTab(
   // Guards against out-of-order responses when paging pieces quickly.
   const loadToken = useRef(0)
 
+  /** Last bar the cursor reached, by playback or by clicking the score. */
+  const cursorBar = useRef<number | null>(null)
+  const cursorVisibleRef = useRef(false)
+  /** Tick seekToBar moved to, until the player confirms it and the view follows. */
+  const scrollAfterSeek = useRef<number | null>(null)
+  /**
+   * Bar a link parked the cursor on, until the reader plays, clicks, stops or
+   * changes piece. The synth can finish loading after the seek and reset to
+   * bar 1 with an unprompted stop; this is what gets restored when it does.
+   */
+  const linkedBar = useRef<number | null>(null)
+
+  /** Park the cursor on a master bar and have the view follow once it moves. */
+  const parkAt = useCallback((instance: alphaTab.AlphaTabApi, index: number) => {
+    const bars = instance.score?.masterBars
+    if (!bars || bars.length === 0) return
+
+    const bar = bars[Math.min(Math.max(index, 0), bars.length - 1)]
+    // alphaTab rebuilds the tick lookup synchronously after scoreLoaded, so
+    // once a piece has rendered the lookup belongs to that piece.
+    const ticks = instance.tickCache
+    const tick = ticks ? ticks.getMasterBarStart(bar) : bar.start
+    instance.tickPosition = tick
+    cursorBar.current = bar.index
+    linkedBar.current = bar.index
+    scrollAfterSeek.current = tick
+    cursorVisibleRef.current = true
+    setCursorVisible(true)
+  }, [])
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -100,6 +137,9 @@ export function useAlphaTab(
       setError(null)
       // A new piece starts at the beginning with no cursor shown.
       setCursorVisible(false)
+      cursorVisibleRef.current = false
+      cursorBar.current = null
+      linkedBar.current = null
       instance.playbackSpeed = speedRef.current
 
       // Remember what this file asked for before any override touches it.
@@ -109,44 +149,85 @@ export function useAlphaTab(
         instance.loadMidiForScore()
       }
     }
-    const onRenderFinished = () => {
-      setIsLoading(false)
-      setRenderVersion((v) => v + 1)
-    }
+    const onRenderFinished = () => setIsLoading(false)
+    const onPostRenderFinished = () => setRenderVersion((v) => v + 1)
     const onError = (e: unknown) => {
       setIsLoading(false)
       setError(`Could not render this piece: ${e instanceof Error ? e.message : String(e)}`)
     }
     const onPlayerReady = () => setIsPlayerReady(true)
+    const showCursor = (visible: boolean) => {
+      cursorVisibleRef.current = visible
+      setCursorVisible(visible)
+    }
     const onPlayerStateChanged = (args: alphaTab.synth.PlayerStateChangedEventArgs) => {
       const playing = args.state === alphaTab.synth.PlayerState.Playing
       setIsPlaying(playing)
       // Playing shows the cursor; stop resets to bar 1 and hides it again.
       // A pause keeps it visible so you can see where you left off.
-      if (playing) setCursorVisible(true)
-      else if (args.stopped) setCursorVisible(false)
+      if (playing) {
+        linkedBar.current = null
+        showCursor(true)
+      } else if (args.stopped) {
+        if (linkedBar.current !== null) {
+          parkAt(instance, linkedBar.current)
+          return
+        }
+        showCursor(false)
+        cursorBar.current = null
+      }
+    }
+    // The cursor only moves once the player confirms a seek, and alphaTab moves
+    // it two animation frames later (a beginInvoke inside a beginInvoke);
+    // follow it after the same two hops. Letting
+    // alphaTab scroll also supersedes its own post-render scroll back to bar 1.
+    // Matched on the tick: loading the MIDI emits seek events of its own near
+    // tick 0, and the player reports ticks with a small shift, so not exactly.
+    const onPlayerPositionChanged = (e: alphaTab.synth.PositionChangedEventArgs) => {
+      const target = scrollAfterSeek.current
+      if (!e.isSeek || target === null || e.currentTick < target) return
+      scrollAfterSeek.current = null
+      requestAnimationFrame(() => requestAnimationFrame(() => instance.scrollToCursor()))
+    }
+    const onPlayedBeatChanged = (beat: alphaTab.model.Beat) => {
+      cursorBar.current = beat.voice.bar.masterBar.index
+    }
+    // Clicking the score seeks there; show the cursor so the spot is visible.
+    const onBeatMouseDown = (beat: alphaTab.model.Beat) => {
+      linkedBar.current = null
+      cursorBar.current = beat.voice.bar.masterBar.index
+      showCursor(true)
     }
 
     instance.scoreLoaded.on(onScoreLoaded)
     instance.renderFinished.on(onRenderFinished)
+    instance.postRenderFinished.on(onPostRenderFinished)
     instance.error.on(onError)
     instance.playerReady.on(onPlayerReady)
     instance.playerStateChanged.on(onPlayerStateChanged)
+    instance.playerPositionChanged.on(onPlayerPositionChanged)
+    instance.playedBeatChanged.on(onPlayedBeatChanged)
+    instance.beatMouseDown.on(onBeatMouseDown)
 
     return () => {
       instance.scoreLoaded.off(onScoreLoaded)
       instance.renderFinished.off(onRenderFinished)
+      instance.postRenderFinished.off(onPostRenderFinished)
       instance.error.off(onError)
       instance.playerReady.off(onPlayerReady)
       instance.playerStateChanged.off(onPlayerStateChanged)
+      instance.playerPositionChanged.off(onPlayerPositionChanged)
+      instance.playedBeatChanged.off(onPlayedBeatChanged)
+      instance.beatMouseDown.off(onBeatMouseDown)
       instance.destroy()
       apiRef.current = null
       setApi(null)
       setIsPlayerReady(false)
       setIsPlaying(false)
       setCursorVisible(false)
+      cursorVisibleRef.current = false
     }
-  }, [containerRef, viewportRef])
+  }, [containerRef, viewportRef, parkAt])
 
   /** Marks a new load as the current one; any earlier in-flight fetch is dropped. */
   const beginLoad = useCallback(() => {
@@ -235,6 +316,8 @@ export function useAlphaTab(
   }, [])
 
   const stop = useCallback(() => {
+    // An explicit stop really does mean back to bar 1, even after a link.
+    linkedBar.current = null
     apiRef.current?.stop()
   }, [])
 
@@ -246,6 +329,18 @@ export function useAlphaTab(
       return !on
     })
   }, [])
+
+  const seekToBar = useCallback(
+    (index: number) => {
+      if (apiRef.current) parkAt(apiRef.current, index)
+    },
+    [parkAt],
+  )
+
+  const currentBar = useCallback(
+    () => (cursorVisibleRef.current ? cursorBar.current : null),
+    [],
+  )
 
   return {
     api,
@@ -268,5 +363,7 @@ export function useAlphaTab(
     playPause,
     stop,
     toggleMetronome,
+    seekToBar,
+    currentBar,
   }
 }

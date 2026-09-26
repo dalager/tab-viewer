@@ -10,10 +10,23 @@ import { useAlphaTab } from '@/hooks/useAlphaTab'
 import { useFullscreen } from '@/hooks/useFullscreen'
 import { type Shortcut, useHotkeys } from '@/hooks/useHotkeys'
 import { IMPORT_ACCEPT, useImportedTabs } from '@/hooks/useImportedTabs'
-import { computeSystemTops, pageBy, scrollToEdge } from '@/score/paging'
+import { parseLocation, piecePath, pieceUrl } from '@/lib/permalink'
+import { computeSystemTops, pageBy, scrollToEdge, topVisibleBar } from '@/score/paging'
 import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
 
 const STORAGE_KEY = 'tab-viewer:selected'
+const COPIED_FEEDBACK_MS = 1500
+
+/** A bar (1-based) to jump to once the given piece has rendered. */
+interface PendingBar {
+  id: string
+  bar: number
+}
+
+function pendingBarFrom(loc: Location): PendingBar | null {
+  const { id, bar } = parseLocation(loc)
+  return id && bar ? { id, bar } : null
+}
 
 export default function App() {
   const shellRef = useRef<HTMLDivElement>(null)
@@ -21,8 +34,9 @@ export default function App() {
   const canvasRef = useRef<HTMLDivElement>(null)
 
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => localStorage.getItem(STORAGE_KEY) ?? tabs[0]?.id ?? null,
+    () => parseLocation().id ?? localStorage.getItem(STORAGE_KEY) ?? tabs[0]?.id ?? null,
   )
+  const pendingBar = useRef<PendingBar | null>(pendingBarFrom(window.location))
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -66,6 +80,8 @@ export default function App() {
     playPause,
     stop,
     toggleMetronome,
+    seekToBar,
+    currentBar,
   } = useAlphaTab(canvasRef, viewportRef)
   const { isFullscreen, toggle: toggleFullscreen, exit: exitFullscreen } = useFullscreen(shellRef)
 
@@ -90,9 +106,56 @@ export default function App() {
     systemTops.current = computeSystemTops(api, viewportRef.current)
   }, [api, renderVersion])
 
+  // Read by effects that must not re-run when it changes: a new selection
+  // must wait for its own render before a pending bar can be applied to it.
+  const selectedIdRef = useRef(selectedId)
+  useEffect(() => {
+    selectedIdRef.current = selectedId
+  }, [selectedId])
+
+  // A link to a bar is applied once, on the first render of its piece, so
+  // later re-renders (zoom, tracks, layout) leave the reader where they are.
+  useEffect(() => {
+    const pending = pendingBar.current
+    if (!pending || renderVersion === 0 || pending.id !== selectedIdRef.current) return
+    pendingBar.current = null
+    seekToBar(pending.bar - 1)
+  }, [renderVersion, seekToBar])
+
   useEffect(() => {
     if (selectedId) localStorage.setItem(STORAGE_KEY, selectedId)
   }, [selectedId])
+
+  // Keep the address bar a permalink to the open piece. Moving between known
+  // pieces adds history entries; landing on "/" or on a slug that no longer
+  // exists is corrected in place instead, so Back does not return to it.
+  useEffect(() => {
+    if (!selectedId) return
+    const target = piecePath(selectedId)
+    if (window.location.pathname === target) return
+    const current = parseLocation().id
+    const known = current !== null && allTabs.some((t) => t.id === current)
+    if (known) window.history.pushState(null, '', target)
+    else window.history.replaceState(null, '', target)
+  }, [selectedId, allTabs])
+
+  useEffect(() => {
+    const onPopState = () => {
+      const { id } = parseLocation()
+      if (!id) return
+      const pending = pendingBarFrom(window.location)
+      if (id === selectedIdRef.current) {
+        // Same piece, already rendered: nothing will re-render, so jump now.
+        pendingBar.current = null
+        if (pending) seekToBar(pending.bar - 1)
+      } else {
+        pendingBar.current = pending
+        setSelectedId(id)
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [seekToBar])
 
   // A new piece starts with every track shown again. Adjusting during render
   // rather than inside the load effect avoids a cascading second render.
@@ -219,6 +282,28 @@ export default function App() {
     [allTabs, selectedIndex],
   )
 
+  const [linkCopied, setLinkCopied] = useState(false)
+  useEffect(() => {
+    if (!linkCopied) return
+    const timer = window.setTimeout(() => setLinkCopied(false), COPIED_FEEDBACK_MS)
+    return () => window.clearTimeout(timer)
+  }, [linkCopied])
+
+  // Links to the bar under the cursor if one is showing, else the first bar
+  // in view. Imports are skipped: their file only exists in this browser.
+  const copyLink = useCallback(async () => {
+    if (!selected || selected.imported) return
+    const bar = (currentBar() ?? topVisibleBar(api, viewportRef.current, layoutMode)) + 1
+    window.history.replaceState(null, '', piecePath(selected.id, bar))
+    try {
+      await navigator.clipboard.writeText(pieceUrl(selected.id, bar))
+      setLinkCopied(true)
+    } catch {
+      // Clipboard can be refused (permissions, insecure context); the address
+      // bar already holds the link, so there is still something to copy.
+    }
+  }, [selected, currentBar, api, layoutMode])
+
   const overlayOpen = paletteOpen || helpOpen
 
   const shortcuts = useMemo<Shortcut[]>(
@@ -298,6 +383,13 @@ export default function App() {
         description: 'Open search palette',
         group: 'Collection',
         run: () => setPaletteOpen(true),
+      },
+      {
+        keys: ['c'],
+        label: 'c',
+        description: 'Copy link to current bar',
+        group: 'Collection',
+        run: () => void copyLink(),
       },
       {
         keys: ['i'],
@@ -431,6 +523,7 @@ export default function App() {
     [
       step,
       goToPiece,
+      copyLink,
       openImportDialog,
       toggleFullscreen,
       cycleLayout,
@@ -510,6 +603,8 @@ export default function App() {
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenHelp={() => setHelpOpen(true)}
         onImport={openImportDialog}
+        linkCopied={linkCopied}
+        onCopyLink={() => void copyLink()}
       />
 
       <div className="flex min-h-0 flex-1">

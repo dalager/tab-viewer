@@ -6,15 +6,22 @@ export const PAGE_FRACTION = 0.92
 /** Below this delta the snap target is effectively the current position. */
 const DEAD_ZONE_PX = 8
 
-/** Vertical offset of `el` within the scrolling `container`. */
-function offsetWithin(el: HTMLElement, container: HTMLElement): number {
-  let y = 0
+/** Offset of `el` within the scrolling `container`, along one axis. */
+function offsetWithin(el: HTMLElement, container: HTMLElement, axis: 'x' | 'y' = 'y'): number {
+  let offset = 0
   let node: HTMLElement | null = el
   while (node && node !== container) {
-    y += node.offsetTop
+    offset += axis === 'y' ? node.offsetTop : node.offsetLeft
     node = node.offsetParent as HTMLElement | null
   }
-  return y
+  return offset
+}
+
+/** Origin of alphaTab's render surface in the scroll container's coordinate space. */
+function surfaceOrigin(viewport: HTMLElement): { x: number; y: number } {
+  const surface = viewport.querySelector<HTMLElement>('.at-surface')
+  if (!surface) return { x: 0, y: 0 }
+  return { x: offsetWithin(surface, viewport, 'x'), y: offsetWithin(surface, viewport, 'y') }
 }
 
 /**
@@ -36,8 +43,7 @@ export function computeSystemTops(
   if (!systems || systems.length === 0) return []
 
   // realBounds.y is relative to the render surface, not the scroll container.
-  const surface = viewport.querySelector<HTMLElement>('.at-surface')
-  const surfaceTop = surface ? offsetWithin(surface, viewport) : 0
+  const surfaceTop = surfaceOrigin(viewport).y
 
   return systems
     .map((s) => surfaceTop + s.realBounds.y)
@@ -93,4 +99,33 @@ export function scrollToEdge(viewport: HTMLElement, edge: 'start' | 'end'): void
     top: edge === 'start' ? 0 : Math.max(0, viewport.scrollHeight - viewport.clientHeight),
     behavior: 'smooth',
   })
+}
+
+/** Slack so a bar sitting right at the fold still counts as visible. */
+const VISIBLE_TOLERANCE_PX = 4
+
+/**
+ * Index of the first master bar whose top (or left edge, in Horizontal layout)
+ * is at or past the current scroll position. Falls back to 0 without bounds.
+ */
+export function topVisibleBar(
+  api: alphaTab.AlphaTabApi | null,
+  viewport: HTMLElement | null,
+  layoutMode: alphaTab.LayoutMode,
+): number {
+  const systems = api?.boundsLookup?.staffSystems
+  if (!viewport || !systems) return 0
+
+  const horizontal = layoutMode === alphaTab.LayoutMode.Horizontal
+  const origin = surfaceOrigin(viewport)
+  const fold = (horizontal ? viewport.scrollLeft : viewport.scrollTop) - VISIBLE_TOLERANCE_PX
+
+  let first: number | null = null
+  for (const system of systems) {
+    for (const bar of system.bars) {
+      const start = horizontal ? origin.x + bar.realBounds.x : origin.y + bar.realBounds.y
+      if (start >= fold && (first === null || bar.index < first)) first = bar.index
+    }
+  }
+  return first ?? 0
 }
