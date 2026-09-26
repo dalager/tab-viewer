@@ -38,6 +38,8 @@ interface ToolbarProps {
   bookName: string | null
   onOpenSongbooks: () => void
   linkCopied: boolean
+  /** Why the open piece cannot be linked, or null when it can. */
+  linkBlocked: string | null
   onCopyLink: () => void
 }
 
@@ -60,7 +62,7 @@ export function Toolbar(props: ToolbarProps) {
         </h1>
         {tab && (
           <p className="truncate text-xs text-neutral-500">
-            {tab.artist} · {tab.ext.toUpperCase()}
+            {[tab.artist, tab.ext.toUpperCase()].filter(Boolean).join(' · ')}
           </p>
         )}
       </div>
@@ -92,12 +94,8 @@ export function Toolbar(props: ToolbarProps) {
         variant="ghost"
         size="sm"
         onClick={props.onCopyLink}
-        disabled={!tab || tab.imported}
-        title={
-          tab?.imported
-            ? 'Imported pieces live only in this browser, so they cannot be linked'
-            : 'Copy link to this bar (c)'
-        }
+        disabled={props.linkBlocked !== null}
+        title={props.linkBlocked ?? 'Copy link to this bar (c)'}
       >
         {props.linkCopied ? 'Copied' : 'Copy link'}
       </Button>

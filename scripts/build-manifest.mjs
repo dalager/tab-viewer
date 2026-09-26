@@ -2,8 +2,10 @@
 //
 // Reads the scraped CSV index, copies every Guitar Pro file into
 // public/songbooks/bach/tabs/ under an ASCII slug name, and emits
-// public/songbooks/bach/songbook.json. The app loads it like any other
-// songbook URL; nothing about the collection is compiled into the bundle.
+// public/songbooks/bach/songbook.json. The same files are also packed into
+// public/songbooks/bach.sbk, a zip the app loads in a single request. The app
+// loads either like any other songbook URL; nothing about the collection is
+// compiled into the bundle.
 //
 // Run via the `predev` / `prebuild` npm scripts so it always precedes Vite.
 
@@ -12,6 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'csv-parse/sync'
+import { zipSync } from 'fflate'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(here, '..')
@@ -21,6 +24,7 @@ const SRC_DIR = path.join(appRoot, 'collection', 'tabs')
 const BOOK_DIR = path.join(appRoot, 'public', 'songbooks', 'bach')
 const OUT_DIR = path.join(BOOK_DIR, 'tabs')
 const MANIFEST = path.join(BOOK_DIR, 'songbook.json')
+const PACKAGE = path.join(appRoot, 'public', 'songbooks', 'bach.sbk')
 const BOOK_NAME = 'Bach Guitar Songbook'
 
 /** ASCII slug: "Suite Nº1" -> "suite-no1". Keeps URLs free of encoding. */
@@ -109,8 +113,16 @@ if (orphaned.length > 0) {
 
 entries.sort((a, b) => a.title.localeCompare(b.title))
 const songbook = { songbook: 1, name: BOOK_NAME, songs: entries }
-fs.writeFileSync(MANIFEST, `${JSON.stringify(songbook, null, 2)}\n`)
+const manifestJson = `${JSON.stringify(songbook, null, 2)}\n`
+fs.writeFileSync(MANIFEST, manifestJson)
+
+// The .sbk holds the same manifest and files, at the same relative paths.
+const packed = { 'songbook.json': new TextEncoder().encode(manifestJson) }
+for (const entry of entries) {
+  packed[entry.url] = fs.readFileSync(path.join(BOOK_DIR, entry.url))
+}
+fs.writeFileSync(PACKAGE, zipSync(packed, { level: 9 }))
 
 console.log(
-  `build-manifest: ${entries.length} tabs (${copied} copied, ${skipped} unchanged) -> public/songbooks/bach/`,
+  `build-manifest: ${entries.length} tabs (${copied} copied, ${skipped} unchanged) -> public/songbooks/bach/ and bach.sbk`,
 )

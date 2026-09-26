@@ -11,12 +11,16 @@ import { useFullscreen } from '@/hooks/useFullscreen'
 import { type Shortcut, useHotkeys } from '@/hooks/useHotkeys'
 import { IMPORT_ACCEPT, useImportedTabs } from '@/hooks/useImportedTabs'
 import { useSongbooks } from '@/hooks/useSongbooks'
+import { isLocalBook } from '@/lib/localSongbooks'
 import { parseLocation, piecePath, pieceUrl } from '@/lib/permalink'
 import type { Songbook } from '@/lib/songbook'
 import { computeSystemTops, pageBy, scrollToEdge, topVisibleBar } from '@/score/paging'
 import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
 
 const STORAGE_KEY = 'tab-viewer:selected'
+/** The file picker and drop zone take packed songbooks as well as single pieces. */
+const OPEN_ACCEPT = `${IMPORT_ACCEPT},.sbk`
+const isSongbookFile = (file: File) => file.name.toLowerCase().endsWith('.sbk')
 const COPIED_FEEDBACK_MS = 1500
 
 /** A bar (1-based) to jump to once the given piece has rendered. */
@@ -60,7 +64,7 @@ export default function App() {
   } = useImportedTabs()
 
   const songbooks = useSongbooks()
-  const { active: book, loading: bookLoading, load: loadBook } = songbooks
+  const { active: book, loading: bookLoading, load: loadBook, openFile: openBookFile } = songbooks
 
   // Imported pieces first, so they sit at the top of the sidebar.
   const allTabs = useMemo(() => [...imported, ...(book?.tabs ?? [])], [imported, book])
@@ -98,6 +102,14 @@ export default function App() {
   const selected = selectedIndex >= 0 ? allTabs[selectedIndex] : null
   // Every piece that is not an import belongs to the one loaded songbook.
   const selectedBook = selected && !selected.imported ? (book?.url ?? null) : null
+  // Pieces whose file exists only in this browser cannot be shared by link.
+  const linkBlocked = !selected
+    ? 'No piece is open'
+    : selected.imported
+      ? 'Imported pieces live only in this browser, so they cannot be linked'
+      : selectedBook && isLocalBook(selectedBook)
+        ? 'This songbook was opened from a file, so its pieces cannot be linked'
+        : null
 
   // A remembered selection may point at an import that has since been removed,
   // a piece in a songbook that was unloaded, or one not loaded yet. Once imports
@@ -110,9 +122,13 @@ export default function App() {
     setSelectedId(fallbackId)
   }
 
-  // A freshly loaded songbook opens on its first piece.
+  // A freshly loaded songbook stays on the open piece if it has one by that id
+  // (a copy of the same book, say), else opens on its first piece. Jumping
+  // regardless would load a second piece while the first is still rendering.
   const onBookLoaded = useCallback((loaded: Songbook) => {
-    setSelectedId(loaded.tabs[0]?.id ?? null)
+    setSelectedId((prev) =>
+      loaded.tabs.some((t) => t.id === prev) ? prev : (loaded.tabs[0]?.id ?? null),
+    )
   }, [])
 
   // Cached staff-system boundaries, invalidated whenever a render completes.
@@ -208,14 +224,20 @@ export default function App() {
     viewportRef.current?.scrollTo({ top: 0 })
   }, [selected, api, loadFile, loadBytes, getBytes])
 
-  // Importing selects the last file added, so it shows up straight away.
+  // Importing selects the last file added, so it shows up straight away. A
+  // .sbk among them is opened as the songbook instead (the last one wins).
   const handleImport = useCallback(
-    async (files: Iterable<File>) => {
-      const ids = await importFiles(files)
-      const last = ids.at(-1)
-      if (last) setSelectedId(last)
+    async (files: File[]) => {
+      const bookFile = files.filter(isSongbookFile).at(-1)
+      const pieces = files.filter((f) => !isSongbookFile(f))
+      const ids = pieces.length > 0 ? await importFiles(pieces) : []
+      const opened = bookFile ? await openBookFile(bookFile) : null
+      if (opened) {
+        onBookLoaded(opened)
+        setSongbooksOpen(false)
+      } else if (ids.length > 0) setSelectedId(ids[ids.length - 1])
     },
-    [importFiles],
+    [importFiles, openBookFile, onBookLoaded],
   )
 
   const openImportDialog = useCallback(() => fileInputRef.current?.click(), [])
@@ -324,7 +346,7 @@ export default function App() {
   // Links to the bar under the cursor if one is showing, else the first bar
   // in view. Imports are skipped: their file only exists in this browser.
   const copyLink = useCallback(async () => {
-    if (!selected || selected.imported) return
+    if (!selected || linkBlocked) return
     const bar = (currentBar() ?? topVisibleBar(api, viewportRef.current, layoutMode)) + 1
     window.history.replaceState(null, '', piecePath(selected.id, bar, selectedBook))
     try {
@@ -334,7 +356,7 @@ export default function App() {
       // Clipboard can be refused (permissions, insecure context); the address
       // bar already holds the link, so there is still something to copy.
     }
-  }, [selected, selectedBook, currentBar, api, layoutMode])
+  }, [selected, selectedBook, linkBlocked, currentBar, api, layoutMode])
 
   const overlayOpen = paletteOpen || helpOpen || songbooksOpen
 
@@ -597,7 +619,7 @@ export default function App() {
       <input
         ref={fileInputRef}
         type="file"
-        accept={IMPORT_ACCEPT}
+        accept={OPEN_ACCEPT}
         multiple
         hidden
         aria-hidden="true"
@@ -612,7 +634,9 @@ export default function App() {
         <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-white/80 p-6">
           <div className="rounded-xl border-2 border-dashed border-neutral-400 px-10 py-8 text-center">
             <p className="text-base font-medium text-neutral-900">Drop to import</p>
-            <p className="mt-1 text-sm text-neutral-500">Guitar Pro files ({IMPORT_ACCEPT})</p>
+            <p className="mt-1 text-sm text-neutral-500">
+              A .sbk songbook, or Guitar Pro files ({IMPORT_ACCEPT})
+            </p>
           </div>
         </div>
       )}
@@ -647,6 +671,7 @@ export default function App() {
         bookName={book?.name ?? null}
         onOpenSongbooks={() => setSongbooksOpen(true)}
         linkCopied={linkCopied}
+        linkBlocked={linkBlocked}
         onCopyLink={() => void copyLink()}
       />
 
@@ -672,10 +697,14 @@ export default function App() {
             <div className="w-full max-w-lg">
               <h2 className="text-lg font-semibold text-neutral-900">Load a songbook</h2>
               <p className="mt-1 mb-6 text-sm text-neutral-500">
-                Paste the URL of a songbook, pick one below, or drop Guitar Pro files anywhere
-                to import them.
+                Paste the URL of a songbook, pick one below, or drop a .sbk songbook or Guitar
+                Pro files anywhere.
               </p>
-              <SongbookPicker songbooks={songbooks} onLoaded={onBookLoaded} />
+              <SongbookPicker
+                songbooks={songbooks}
+                onLoaded={onBookLoaded}
+                onOpenFile={openImportDialog}
+              />
             </div>
           </div>
         )}
@@ -688,6 +717,7 @@ export default function App() {
         onSelect={setSelectedId}
       />
       <SongbookDialog
+        onOpenFile={openImportDialog}
         songbooks={songbooks}
         open={songbooksOpen}
         onOpenChange={setSongbooksOpen}

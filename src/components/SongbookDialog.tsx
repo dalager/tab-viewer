@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { UseSongbooks } from '@/hooks/useSongbooks'
+import { isLocalBook } from '@/lib/localSongbooks'
 import { absoluteBookUrl, type Songbook, SUGGESTED_SONGBOOKS } from '@/lib/songbook'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,13 @@ interface SongbookPickerProps {
   songbooks: UseSongbooks
   /** Called after a book loads successfully, e.g. to select its first piece. */
   onLoaded: (book: Songbook) => void
+  /** Opens the file picker, which takes .sbk songbooks as well as Guitar Pro files. */
+  onOpenFile: () => void
+}
+
+/** Where a book lives, for display: its URL, or a note for one opened from a file. */
+function describeUrl(url: string): string {
+  return isLocalBook(url) ? 'Opened from a file, stored in this browser' : url
 }
 
 function SectionLabel({ children }: { children: string }) {
@@ -31,7 +39,7 @@ function SectionLabel({ children }: { children: string }) {
  * Everything needed to pick a songbook: a URL field, the bundled suggestions
  * and the books loaded before. Shared by the dialog and the empty state.
  */
-export function SongbookPicker({ songbooks, onLoaded }: SongbookPickerProps) {
+export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPickerProps) {
   const { active, remembered, loading, error, load, unload, forget, clearAll } = songbooks
   const [url, setUrl] = useState('')
 
@@ -55,7 +63,7 @@ export function SongbookPicker({ songbooks, onLoaded }: SongbookPickerProps) {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-neutral-900">{active.name}</p>
               <p className="truncate text-xs text-neutral-500">
-                {active.tabs.length} pieces · {active.url}
+                {active.tabs.length} pieces · {describeUrl(active.url)}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={unload}>
@@ -76,7 +84,7 @@ export function SongbookPicker({ songbooks, onLoaded }: SongbookPickerProps) {
           <Input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com/songbook.json"
+            placeholder="https://example.com/songbook.json or .sbk"
             aria-label="Songbook URL"
             className="h-9 bg-white"
           />
@@ -84,6 +92,13 @@ export function SongbookPicker({ songbooks, onLoaded }: SongbookPickerProps) {
             {loading ? 'Loading…' : 'Load'}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-neutral-500">
+          Or{' '}
+          <button type="button" onClick={onOpenFile} className="underline hover:text-neutral-900">
+            open a .sbk file
+          </button>{' '}
+          from your computer, or drop one anywhere.
+        </p>
         {error && <p className="mt-2 text-xs whitespace-pre-line text-red-700">{error}</p>}
       </form>
 
@@ -133,7 +148,7 @@ export function SongbookPicker({ songbooks, onLoaded }: SongbookPickerProps) {
                       ? 'bg-neutral-900 text-white'
                       : 'text-neutral-700 hover:bg-neutral-200',
                   )}
-                  title={b.url}
+                  title={describeUrl(b.url)}
                 >
                   <span className="block truncate text-sm">{b.name}</span>
                   <span
@@ -142,7 +157,7 @@ export function SongbookPicker({ songbooks, onLoaded }: SongbookPickerProps) {
                       b.url === active?.url ? 'text-neutral-300' : 'text-neutral-500',
                     )}
                   >
-                    {b.url}
+                    {describeUrl(b.url)}
                   </span>
                 </button>
                 <button
@@ -168,19 +183,27 @@ interface SongbookDialogProps extends SongbookPickerProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function SongbookDialog({ open, onOpenChange, songbooks, onLoaded }: SongbookDialogProps) {
+export function SongbookDialog({
+  open,
+  onOpenChange,
+  songbooks,
+  onLoaded,
+  onOpenFile,
+}: SongbookDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Songbooks</DialogTitle>
           <DialogDescription>
-            A songbook is a JSON file listing Guitar Pro files, hosted at any URL.
+            A songbook is a JSON file listing Guitar Pro files, or a .sbk file packing them
+            into one download.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[65vh] overflow-y-auto pr-1">
           <SongbookPicker
             songbooks={songbooks}
+            onOpenFile={onOpenFile}
             onLoaded={(book) => {
               onLoaded(book)
               onOpenChange(false)

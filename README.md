@@ -20,8 +20,9 @@ Then open http://localhost:5173/. Node.js 20 or newer is required.
 
 - **`npm run manifest`** builds the bundled *Bach Guitar Songbook*: it copies
   every file from `collection/tabs/` into `public/songbooks/bach/tabs/` under
-  an ASCII slug name and writes `public/songbooks/bach/songbook.json`. Reruns
-  are instant; only changed files are copied.
+  an ASCII slug name, writes `public/songbooks/bach/songbook.json`, and packs
+  both into `public/songbooks/bach.sbk`. Reruns are instant; only changed
+  files are copied.
 - **`npm run soundfont`** downloads the MuseScore_General soundfont (~40 MB,
   one time) into `public/soundfont/`. Playback uses it instead of alphaTab's
   bundled feature-phone bank. If the download fails, it falls back to the
@@ -52,8 +53,24 @@ so a folder holding `songbook.json` and its files is a complete songbook.
 A songbook on another host must be served with CORS headers that allow `GET`
 from the viewer's origin.
 
+### .sbk files
+
+A `.sbk` is the same thing zipped: `songbook.json` at the root (or inside a
+single top-level folder) and the files its song URLs point at. It loads in one
+request and, once loaded, opens every piece without further downloads. Load
+one by URL like a JSON songbook, or open or drop a `.sbk` file into the app:
+it is stored in the browser's IndexedDB and listed with the other songbooks,
+but its pieces cannot be shared by link. To make one:
+
+```sh
+cd my-book && zip -r ../my-book.sbk songbook.json tabs
+```
+
+A `.sbk` may unpack to at most 5000 files and 200 MB.
+
 A first visit starts empty. Press `o` or click *Songbook* in the toolbar to
-paste a URL or pick the bundled *Bach Guitar Songbook*. One songbook is loaded
+paste a URL, open a `.sbk` file, or pick the bundled *Bach Guitar Songbook*
+(served as `bach.sbk`). One songbook is loaded
 at a time; the loaded one and every one loaded before are remembered in
 `localStorage`, and can be switched between, unloaded, forgotten or cleared
 from the same dialog. The bundled book is listed in `SUGGESTED_SONGBOOKS` in
