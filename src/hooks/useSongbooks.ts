@@ -10,6 +10,7 @@ const REMEMBERED_KEY = 'tab-viewer:songbooks'
 export interface RememberedBook {
   url: string
   name: string
+  description?: string
 }
 
 export interface UseSongbooks {
@@ -88,7 +89,7 @@ export function useSongbooks(): UseSongbooks {
         setError(null)
         localStorage.setItem(ACTIVE_KEY, book.url)
         setRemembered((prev) => [
-          { url: book.url, name: book.name },
+          { url: book.url, name: book.name, description: book.description },
           ...prev.filter((b) => b.url !== book.url),
         ])
         return book

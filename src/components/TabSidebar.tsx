@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useFavorites } from '@/hooks/useFavorites'
-import { cn } from '@/lib/utils'
+import { cn, filterTabs } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
 interface TabSidebarProps {
@@ -14,6 +14,8 @@ interface TabSidebarProps {
   onSelect: (id: string) => void
   /** Called for pieces with `imported` set; they get a remove button. */
   onRemove: (id: string) => void
+  /** Opens the dialog that packs chosen pieces into a new songbook. */
+  onExport: () => void
 }
 
 /**
@@ -43,18 +45,21 @@ function SectionHeading({ children }: { children: string }) {
 /** Rows rendered initially, and added each time the sentinel comes into view. */
 const PAGE_SIZE = 60
 
-export function TabSidebar({ tabs, bookName, selectedId, onSelect, onRemove }: TabSidebarProps) {
+export function TabSidebar({
+  tabs,
+  bookName,
+  selectedId,
+  onSelect,
+  onRemove,
+  onExport,
+}: TabSidebarProps) {
   const [query, setQuery] = useState('')
   const hasImports = useMemo(() => tabs.some((t) => t.imported), [tabs])
   const [visible, setVisible] = useState(PAGE_SIZE)
   const sentinelRef = useRef<HTMLLIElement>(null)
   const { favorites, isFavorite, toggleFavorite } = useFavorites()
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return tabs
-    return tabs.filter((t) => t.title.toLowerCase().includes(q))
-  }, [tabs, query])
+  const filtered = useMemo(() => filterTabs(tabs, query), [tabs, query])
 
   // A new filter starts a new list, so go back to the first page. Adjusting
   // during render (rather than in an effect) avoids a throwaway second pass.
@@ -155,9 +160,20 @@ export function TabSidebar({ tabs, bookName, selectedId, onSelect, onRemove }: T
           aria-label="Filter pieces"
           className="h-9 bg-white"
         />
-        <p className="mt-2 text-xs text-neutral-500">
-          {filtered.length} of {tabs.length}
-        </p>
+        <div className="mt-2 flex items-baseline justify-between text-xs text-neutral-500">
+          <p>
+            {filtered.length} of {tabs.length}
+          </p>
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={tabs.length === 0}
+            className="hover:text-neutral-900 disabled:opacity-50"
+            title="Pack pieces into a new .sbk songbook (e)"
+          >
+            Export…
+          </button>
+        </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">

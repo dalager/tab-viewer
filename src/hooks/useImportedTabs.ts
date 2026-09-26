@@ -1,5 +1,5 @@
 import * as alphaTab from '@coderline/alphatab'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   deleteImported,
   type ImportedRecord,
@@ -25,8 +25,6 @@ export interface UseImportedTabs {
   /** Parses, stores and lists each file. Resolves to the ids that were added. */
   importFiles: (files: Iterable<File>) => Promise<string[]>
   removeImported: (id: string) => Promise<void>
-  /** The file contents for an imported id, or undefined if unknown. */
-  getBytes: (id: string) => ArrayBuffer | undefined
 }
 
 function toEntry(record: ImportedRecord): TabEntry {
@@ -35,7 +33,8 @@ function toEntry(record: ImportedRecord): TabEntry {
     title: record.title,
     artist: record.artist,
     ext: record.ext,
-    file: '',
+    // A blob URL, like a .sbk piece's, so every piece is loaded by fetching `file`.
+    file: URL.createObjectURL(new Blob([record.bytes])),
     imported: true,
   }
 }
@@ -91,14 +90,13 @@ async function toRecord(file: File): Promise<ImportedRecord> {
 /**
  * User-imported pieces, persisted in IndexedDB so they survive a reload.
  *
- * The bytes stay in memory alongside the list: they are small (a few hundred
- * KB at most), and it keeps loading a piece synchronous and simple.
+ * Each file is held in memory as a blob URL: they are small (a few hundred KB
+ * at most), and it lets imports load exactly like songbook pieces.
  */
 export function useImportedTabs(): UseImportedTabs {
   const [imported, setImported] = useState<TabEntry[]>([])
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const bytesRef = useRef(new Map<string, ArrayBuffer>())
 
   useEffect(() => {
     let cancelled = false
@@ -106,7 +104,6 @@ export function useImportedTabs(): UseImportedTabs {
       .then((records) => {
         if (cancelled) return
         records.sort((a, b) => a.addedAt - b.addedAt)
-        for (const r of records) bytesRef.current.set(r.id, r.bytes)
         setImported(records.map(toEntry))
       })
       .catch((e: unknown) => {
@@ -128,7 +125,6 @@ export function useImportedTabs(): UseImportedTabs {
       try {
         const record = await toRecord(file)
         await putImported(record)
-        bytesRef.current.set(record.id, record.bytes)
         added.push(toEntry(record))
       } catch (e) {
         failures.push(errorMessage(e))
@@ -147,11 +143,12 @@ export function useImportedTabs(): UseImportedTabs {
       setError(errorMessage(e))
       return
     }
-    bytesRef.current.delete(id)
-    setImported((prev) => prev.filter((t) => t.id !== id))
+    setImported((prev) => {
+      const gone = prev.find((t) => t.id === id)
+      if (gone) URL.revokeObjectURL(gone.file)
+      return prev.filter((t) => t.id !== id)
+    })
   }, [])
 
-  const getBytes = useCallback((id: string) => bytesRef.current.get(id), [])
-
-  return { imported, ready, error, importFiles, removeImported, getBytes }
+  return { imported, ready, error, importFiles, removeImported }
 }

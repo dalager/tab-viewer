@@ -5,7 +5,7 @@ export interface TabEntry {
   artist: string
   /** gp3/gp4/gp5 for the bundled songbook; others may also be gpx or gp. */
   ext: string
-  /** Absolute URL of the file for songbook pieces. Empty for imports. */
+  /** URL of the file: http(s) for hosted songbooks, blob: for .sbk pieces and imports. */
   file: string
   /** Set on pieces the user imported; their bytes live in IndexedDB, not under public/. */
   imported?: true

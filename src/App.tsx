@@ -1,5 +1,6 @@
 import * as alphaTab from '@coderline/alphatab'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ExportDialog } from '@/components/ExportDialog'
 import { ScoreView } from '@/components/ScoreView'
 import { ShortcutHelp } from '@/components/ShortcutHelp'
 import { SongbookDialog, SongbookPicker } from '@/components/SongbookDialog'
@@ -8,7 +9,7 @@ import { TabSidebar } from '@/components/TabSidebar'
 import { Toolbar } from '@/components/Toolbar'
 import { useAlphaTab } from '@/hooks/useAlphaTab'
 import { useFullscreen } from '@/hooks/useFullscreen'
-import { type Shortcut, useHotkeys } from '@/hooks/useHotkeys'
+import { useHotkeys } from '@/hooks/useHotkeys'
 import { IMPORT_ACCEPT, useImportedTabs } from '@/hooks/useImportedTabs'
 import { useSongbooks } from '@/hooks/useSongbooks'
 import { isLocalBook } from '@/lib/localSongbooks'
@@ -16,8 +17,11 @@ import { parseLocation, piecePath, pieceUrl } from '@/lib/permalink'
 import type { Songbook } from '@/lib/songbook'
 import { computeSystemTops, pageBy, scrollToEdge, topVisibleBar } from '@/score/paging'
 import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
+import { SHORTCUTS, type ShortcutActions } from '@/shortcuts'
 
 const STORAGE_KEY = 'tab-viewer:selected'
+
+type Overlay = 'palette' | 'help' | 'songbooks' | 'export'
 /** The file picker and drop zone take packed songbooks as well as single pieces. */
 const OPEN_ACCEPT = `${IMPORT_ACCEPT},.sbk`
 const isSongbookFile = (file: File) => file.name.toLowerCase().endsWith('.sbk')
@@ -44,9 +48,13 @@ export default function App() {
   )
   const pendingBar = useRef<PendingBar | null>(pendingBarFrom(window.location))
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [paletteOpen, setPaletteOpen] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
-  const [songbooksOpen, setSongbooksOpen] = useState(false)
+  // At most one dialog is open at a time; Escape closes it.
+  const [overlay, setOverlay] = useState<Overlay | null>(null)
+  const openOverlay = (which: Overlay) => () => setOverlay(which)
+  const overlayProps = (which: Overlay) => ({
+    open: overlay === which,
+    onOpenChange: (open: boolean) => setOverlay(open ? which : null),
+  })
   // Empty set means "render every track".
   const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set())
   const [scale, setScale] = useState(1)
@@ -60,7 +68,6 @@ export default function App() {
     error: importError,
     importFiles,
     removeImported,
-    getBytes,
   } = useImportedTabs()
 
   const songbooks = useSongbooks()
@@ -76,7 +83,6 @@ export default function App() {
     error,
     renderVersion,
     loadFile,
-    loadBytes,
     renderTracks,
     isPlayerReady,
     isPlaying,
@@ -215,14 +221,21 @@ export default function App() {
 
   useEffect(() => {
     if (!selected || !api) return
-    if (selected.imported) {
-      const bytes = getBytes(selected.id)
-      if (bytes) loadBytes(bytes)
-    } else {
-      void loadFile(selected.file)
-    }
+    void loadFile(selected.file)
     viewportRef.current?.scrollTo({ top: 0 })
-  }, [selected, api, loadFile, loadBytes, getBytes])
+  }, [selected, api, loadFile])
+
+  /** Stores a .sbk in this browser, switches to it and closes whatever dialog led there. */
+  const openBook = useCallback(
+    async (file: File) => {
+      const opened = await openBookFile(file)
+      if (!opened) return false
+      onBookLoaded(opened)
+      setOverlay(null)
+      return true
+    },
+    [openBookFile, onBookLoaded],
+  )
 
   // Importing selects the last file added, so it shows up straight away. A
   // .sbk among them is opened as the songbook instead (the last one wins).
@@ -231,13 +244,10 @@ export default function App() {
       const bookFile = files.filter(isSongbookFile).at(-1)
       const pieces = files.filter((f) => !isSongbookFile(f))
       const ids = pieces.length > 0 ? await importFiles(pieces) : []
-      const opened = bookFile ? await openBookFile(bookFile) : null
-      if (opened) {
-        onBookLoaded(opened)
-        setSongbooksOpen(false)
-      } else if (ids.length > 0) setSelectedId(ids[ids.length - 1])
+      const opened = bookFile ? await openBook(bookFile) : false
+      if (!opened && ids.length > 0) setSelectedId(ids[ids.length - 1])
     },
-    [importFiles, openBookFile, onBookLoaded],
+    [importFiles, openBook],
   )
 
   const openImportDialog = useCallback(() => fileInputRef.current?.click(), [])
@@ -358,254 +368,41 @@ export default function App() {
     }
   }, [selected, selectedBook, linkBlocked, currentBar, api, layoutMode])
 
-  const overlayOpen = paletteOpen || helpOpen || songbooksOpen
+  const overlayOpen = overlay !== null
 
-  const shortcuts = useMemo<Shortcut[]>(
-    () => [
-      {
-        keys: ['PageDown'],
-        label: 'PageDown',
-        description: 'Next page',
-        group: 'Reading',
-        run: () => step(1, 0.92),
-      },
-      {
-        keys: ['PageUp'],
-        label: 'PageUp',
-        description: 'Previous page',
-        group: 'Reading',
-        run: () => step(-1, 0.92),
-      },
-      {
-        keys: ['j'],
-        label: 'j',
-        description: 'Half page down',
-        group: 'Reading',
-        run: () => step(1, 0.46),
-      },
-      {
-        keys: ['k'],
-        label: 'k',
-        description: 'Half page up',
-        group: 'Reading',
-        run: () => step(-1, 0.46),
-      },
-      {
-        keys: ['Home'],
-        label: 'Home',
-        description: 'Start of score',
-        group: 'Reading',
-        run: () => {
-          if (viewportRef.current) scrollToEdge(viewportRef.current, 'start')
-        },
-      },
-      {
-        keys: ['End'],
-        label: 'End',
-        description: 'End of score',
-        group: 'Reading',
-        run: () => {
-          if (viewportRef.current) scrollToEdge(viewportRef.current, 'end')
-        },
-      },
+  const shortcutActions: ShortcutActions = {
+    pageDown: () => step(1, 0.92),
+    pageUp: () => step(-1, 0.92),
+    halfPageDown: () => step(1, 0.46),
+    halfPageUp: () => step(-1, 0.46),
+    scoreStart: () => viewportRef.current && scrollToEdge(viewportRef.current, 'start'),
+    scoreEnd: () => viewportRef.current && scrollToEdge(viewportRef.current, 'end'),
+    nextPiece: () => goToPiece(1),
+    previousPiece: () => goToPiece(-1),
+    openPalette: openOverlay('palette'),
+    copyLink: () => void copyLink(),
+    openSongbooks: openOverlay('songbooks'),
+    openExport: openOverlay('export'),
+    openImport: openImportDialog,
+    toggleFullscreen,
+    toggleSidebar: () => setSidebarOpen((v) => !v),
+    cycleLayout,
+    toggleTracks,
+    zoomIn: () => zoomBy(0.1),
+    zoomOut: () => zoomBy(-0.1),
+    resetZoom,
+    playPause,
+    stop,
+    toggleMetronome,
+    toggleGuitarOnly,
+    slower: () => nudgeSpeed(-SPEED_STEP),
+    faster: () => nudgeSpeed(SPEED_STEP),
+    resetSpeed: () => setSpeed(1),
+    toggleHelp: () => setOverlay((o) => (o === 'help' ? null : 'help')),
+    escape: () => (overlay ? setOverlay(null) : void exitFullscreen()),
+  }
 
-      {
-        keys: ['n', ']'],
-        label: 'n / ]',
-        description: 'Next piece',
-        group: 'Collection',
-        run: () => goToPiece(1),
-      },
-      {
-        keys: ['p', '['],
-        label: 'p / [',
-        description: 'Previous piece',
-        group: 'Collection',
-        run: () => goToPiece(-1),
-      },
-      {
-        keys: ['k'],
-        label: 'Ctrl+K',
-        description: 'Open search palette',
-        group: 'Collection',
-        withCtrl: true,
-        run: () => setPaletteOpen(true),
-      },
-      {
-        keys: ['/'],
-        label: '/',
-        description: 'Open search palette',
-        group: 'Collection',
-        run: () => setPaletteOpen(true),
-      },
-      {
-        keys: ['c'],
-        label: 'c',
-        description: 'Copy link to current bar',
-        group: 'Collection',
-        run: () => void copyLink(),
-      },
-      {
-        keys: ['o'],
-        label: 'o',
-        description: 'Open songbook',
-        group: 'Collection',
-        run: () => setSongbooksOpen(true),
-      },
-      {
-        keys: ['i'],
-        label: 'i',
-        description: 'Import Guitar Pro files',
-        group: 'Collection',
-        run: openImportDialog,
-      },
-
-      {
-        keys: ['f'],
-        label: 'f',
-        description: 'Toggle full screen',
-        group: 'View',
-        run: toggleFullscreen,
-      },
-      {
-        keys: ['b'],
-        label: 'b',
-        description: 'Toggle sidebar',
-        group: 'View',
-        run: () => setSidebarOpen((v) => !v),
-      },
-      {
-        keys: ['l'],
-        label: 'l',
-        description: 'Cycle layout mode',
-        group: 'View',
-        run: cycleLayout,
-      },
-      {
-        keys: ['t'],
-        label: 't',
-        description: 'All tracks / first track',
-        group: 'View',
-        run: toggleTracks,
-      },
-      {
-        keys: ['+', '='],
-        label: '+',
-        description: 'Zoom in',
-        group: 'View',
-        run: () => zoomBy(0.1),
-      },
-      {
-        keys: ['-'],
-        label: '-',
-        description: 'Zoom out',
-        group: 'View',
-        run: () => zoomBy(-0.1),
-      },
-      {
-        keys: ['0'],
-        label: '0',
-        description: 'Reset zoom',
-        group: 'View',
-        run: resetZoom,
-      },
-
-      {
-        keys: [' '],
-        label: 'Space',
-        description: 'Play / pause',
-        group: 'Playback',
-        run: playPause,
-      },
-      {
-        keys: ['s'],
-        label: 's',
-        description: 'Stop',
-        group: 'Playback',
-        run: stop,
-      },
-      {
-        keys: ['m'],
-        label: 'm',
-        description: 'Toggle metronome',
-        group: 'Playback',
-        run: toggleMetronome,
-      },
-      {
-        keys: ['g'],
-        label: 'g',
-        description: 'Play everything on nylon guitar',
-        group: 'Playback',
-        run: toggleGuitarOnly,
-      },
-      {
-        keys: [','],
-        label: ',',
-        description: 'Slower',
-        group: 'Playback',
-        run: () => nudgeSpeed(-SPEED_STEP),
-      },
-      {
-        keys: ['.'],
-        label: '.',
-        description: 'Faster',
-        group: 'Playback',
-        run: () => nudgeSpeed(SPEED_STEP),
-      },
-      {
-        keys: ['\\'],
-        label: '\\',
-        description: 'Reset speed to 100%',
-        group: 'Playback',
-        run: () => setSpeed(1),
-      },
-
-      {
-        keys: ['?'],
-        label: '?',
-        description: 'Toggle this help',
-        group: 'Overlays',
-        allowInOverlay: true,
-        run: () => setHelpOpen((v) => !v),
-      },
-      {
-        keys: ['Escape'],
-        label: 'Esc',
-        description: 'Close overlay, else leave full screen',
-        group: 'Overlays',
-        allowInOverlay: true,
-        run: () => {
-          if (helpOpen) setHelpOpen(false)
-          else if (paletteOpen) setPaletteOpen(false)
-          else if (songbooksOpen) setSongbooksOpen(false)
-          else void exitFullscreen()
-        },
-      },
-    ],
-    [
-      step,
-      goToPiece,
-      copyLink,
-      openImportDialog,
-      toggleFullscreen,
-      cycleLayout,
-      toggleTracks,
-      zoomBy,
-      resetZoom,
-      exitFullscreen,
-      helpOpen,
-      paletteOpen,
-      songbooksOpen,
-      playPause,
-      stop,
-      toggleMetronome,
-      setSpeed,
-      nudgeSpeed,
-      toggleGuitarOnly,
-    ],
-  )
-
-  useHotkeys(shortcuts, overlayOpen)
+  useHotkeys(SHORTCUTS, shortcutActions, overlayOpen)
 
   return (
     <div
@@ -665,11 +462,11 @@ export default function App() {
         onZoom={zoomBy}
         onResetZoom={resetZoom}
         onToggleFullscreen={toggleFullscreen}
-        onOpenPalette={() => setPaletteOpen(true)}
-        onOpenHelp={() => setHelpOpen(true)}
+        onOpenPalette={openOverlay('palette')}
+        onOpenHelp={openOverlay('help')}
         onImport={openImportDialog}
         bookName={book?.name ?? null}
-        onOpenSongbooks={() => setSongbooksOpen(true)}
+        onOpenSongbooks={openOverlay('songbooks')}
         linkCopied={linkCopied}
         linkBlocked={linkBlocked}
         onCopyLink={() => void copyLink()}
@@ -683,6 +480,7 @@ export default function App() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onRemove={(id) => void removeImported(id)}
+            onExport={openOverlay('export')}
           />
         )}
         <ScoreView
@@ -712,18 +510,22 @@ export default function App() {
 
       <TabCommandPalette
         tabs={allTabs}
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
+        {...overlayProps('palette')}
         onSelect={setSelectedId}
       />
       <SongbookDialog
         onOpenFile={openImportDialog}
         songbooks={songbooks}
-        open={songbooksOpen}
-        onOpenChange={setSongbooksOpen}
+        {...overlayProps('songbooks')}
         onLoaded={onBookLoaded}
       />
-      <ShortcutHelp shortcuts={shortcuts} open={helpOpen} onOpenChange={setHelpOpen} />
+      <ExportDialog
+        {...overlayProps('export')}
+        tabs={allTabs}
+        bookName={book?.name ?? null}
+        onSaveAndOpen={openBook}
+      />
+      <ShortcutHelp shortcuts={SHORTCUTS} {...overlayProps('help')} />
     </div>
   )
 }

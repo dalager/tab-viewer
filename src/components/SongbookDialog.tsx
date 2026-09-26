@@ -62,6 +62,9 @@ export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPick
             <BookOpen className="size-4 shrink-0 text-neutral-500" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-neutral-900">{active.name}</p>
+              {active.description && (
+                <p className="line-clamp-2 text-xs text-neutral-600">{active.description}</p>
+              )}
               <p className="truncate text-xs text-neutral-500">
                 {active.tabs.length} pieces · {describeUrl(active.url)}
               </p>
@@ -151,6 +154,16 @@ export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPick
                   title={describeUrl(b.url)}
                 >
                   <span className="block truncate text-sm">{b.name}</span>
+                  {b.description && (
+                    <span
+                      className={cn(
+                        'block truncate text-xs',
+                        b.url === active?.url ? 'text-neutral-200' : 'text-neutral-600',
+                      )}
+                    >
+                      {b.description}
+                    </span>
+                  )}
                   <span
                     className={cn(
                       'block truncate text-xs',

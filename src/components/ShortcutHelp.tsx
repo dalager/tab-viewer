@@ -9,7 +9,7 @@ import {
 import type { Shortcut } from '@/hooks/useHotkeys'
 
 interface ShortcutHelpProps {
-  shortcuts: Shortcut[]
+  shortcuts: readonly Shortcut[]
   open: boolean
   onOpenChange: (open: boolean) => void
 }

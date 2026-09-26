@@ -68,6 +68,15 @@ cd my-book && zip -r ../my-book.sbk songbook.json tabs
 
 A `.sbk` may unpack to at most 5000 files and 200 MB.
 
+### Exporting a songbook
+
+Press `e`, or click *Export…* above the sidebar list, to pack pieces into a new
+`.sbk`. Pick from the loaded songbook and your imported pieces (your starred
+ones are preselected; *All* and *None* act on what the filter shows), give it a
+name and an optional description, then either *Download .sbk* to share it, or
+*Save & open* to keep it in this browser and switch to it. Pieces are renamed
+after their titles inside the file, so imports get readable ids.
+
 A first visit starts empty. Press `o` or click *Songbook* in the toolbar to
 paste a URL, open a `.sbk` file, or pick the bundled *Bach Guitar Songbook*
 (served as `bach.sbk`). One songbook is loaded
@@ -120,6 +129,7 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 | `n` / `p` | Next / previous piece |
 | `/` or `Ctrl+K` | Search the songbook |
 | `o` | Load, switch or unload a songbook |
+| `e` | Export pieces as a new songbook |
 | `c` | Copy a link to the current bar |
 | `Space`, `s` | Play / pause, stop |
 | `,` / `.` / `\` | Slower / faster / reset to 100% |

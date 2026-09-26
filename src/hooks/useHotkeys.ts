@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
-export interface Shortcut {
+export interface Shortcut<A extends string = string> {
   /** event.key values that trigger this shortcut. */
   keys: string[]
   /** Shown in the help overlay. */
@@ -11,7 +11,8 @@ export interface Shortcut {
   withCtrl?: boolean
   /** Still fires while a dialog is open (Escape only). */
   allowInOverlay?: boolean
-  run: (event: KeyboardEvent) => void
+  /** Name of the action to run; the caller supplies the implementations. */
+  action: A
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -27,9 +28,21 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * shortcuts that explicitly opt in. Handled keys get preventDefault() so
  * PageDown does not also scroll natively.
  */
-export function useHotkeys(shortcuts: Shortcut[], overlayOpen: boolean): void {
+export function useHotkeys<A extends string>(
+  shortcuts: readonly Shortcut<A>[],
+  actions: Record<A, () => void>,
+  overlayOpen: boolean,
+): void {
+  // Read when a key is pressed, so the listener never has to be re-attached
+  // just because an action closed over newer state.
+  const latest = useRef({ actions, overlayOpen })
+  useEffect(() => {
+    latest.current = { actions, overlayOpen }
+  })
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const { actions, overlayOpen } = latest.current
       const typing = isTypingTarget(event.target)
       const modified = event.ctrlKey || event.metaKey || event.altKey
 
@@ -41,12 +54,12 @@ export function useHotkeys(shortcuts: Shortcut[], overlayOpen: boolean): void {
         if (typing && !shortcut.allowInOverlay && !shortcut.withCtrl) continue
 
         event.preventDefault()
-        shortcut.run(event)
+        actions[shortcut.action]()
         return
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [shortcuts, overlayOpen])
+  }, [shortcuts])
 }

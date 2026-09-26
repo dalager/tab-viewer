@@ -1,6 +1,6 @@
 import * as alphaTab from '@coderline/alphatab'
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, fetchBytes } from '@/lib/utils'
 import { buildSettings, MAX_SPEED, MIN_SPEED, NYLON_GUITAR_PROGRAM } from '@/score/settings'
 
 export interface UseAlphaTab {
@@ -13,9 +13,8 @@ export interface UseAlphaTab {
    * renderFinished, which fires before it exists); paging and bar links read it.
    */
   renderVersion: number
+  /** Load a piece by URL; http for hosted songbooks, blob for .sbk pieces and imports. */
   loadFile: (url: string) => Promise<void>
-  /** Load a file already in memory, e.g. one the user imported. */
-  loadBytes: (buffer: ArrayBuffer) => void
   /** Render only these track indexes. Empty set is treated as "all". */
   renderTracks: (indexes: Set<number>) => void
   /** True once the soundfont is loaded and playback is usable. */
@@ -237,18 +236,6 @@ export function useAlphaTab(
     return ++loadToken.current
   }, [])
 
-  const loadBytes = useCallback(
-    (buffer: ArrayBuffer) => {
-      const instance = apiRef.current
-      if (!instance) return
-      beginLoad()
-      // Always load every track ([-1]); which ones are *rendered* is a separate
-      // concern handled by renderTracks, so toggling needs no refetch.
-      instance.load(buffer, [-1])
-    },
-    [beginLoad],
-  )
-
   const loadFile = useCallback(
     async (url: string) => {
       const instance = apiRef.current
@@ -256,11 +243,11 @@ export function useAlphaTab(
 
       const token = beginLoad()
       try {
-        const response = await fetch(url)
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
-        const buffer = await response.arrayBuffer()
+        const bytes = await fetchBytes(url)
         if (token !== loadToken.current) return // superseded by a newer selection
-        instance.load(buffer, [-1])
+        // Always load every track ([-1]); which ones are *rendered* is a separate
+        // concern handled by renderTracks, so toggling needs no refetch.
+        instance.load(bytes.buffer, [-1])
       } catch (e) {
         if (token !== loadToken.current) return
         setIsLoading(false)
@@ -350,7 +337,6 @@ export function useAlphaTab(
     error,
     renderVersion,
     loadFile,
-    loadBytes,
     renderTracks,
     isPlayerReady,
     isPlaying,

@@ -4,10 +4,12 @@
  * single top-level folder, plus the files its song URLs point at.
  */
 
-import { type UnzipFileInfo, unzipSync } from 'fflate'
+import { type UnzipFileInfo, unzipSync, type Zippable, zipSync } from 'fflate'
 import { errorMessage } from '@/lib/utils'
 
-const MANIFEST = 'songbook.json'
+export const MANIFEST = 'songbook.json'
+/** gpx and gp are zips already; deflating them again only costs time. */
+const PRECOMPRESSED = /\.(gpx|gp)$/i
 /** Generous for tabs (the 100-piece Bach book is 0.7 MB), small enough to refuse a zip bomb. */
 const MAX_ENTRIES = 5000
 const MAX_UNPACKED_BYTES = 200 * 1024 * 1024
@@ -63,4 +65,22 @@ export function unpackSongbook(bytes: Uint8Array): UnpackedSongbook {
     root: name.slice(0, -MANIFEST.length),
     read: (names) => unzipSync(bytes, { filter: (file) => names.has(file.name) }),
   }
+}
+
+/**
+ * Zips a manifest and the files it lists (by path) into a .sbk. `level` 0
+ * stores without compressing, for a copy that never leaves the browser.
+ */
+export function packSongbook(
+  manifest: unknown,
+  files: Record<string, Uint8Array>,
+  level: 0 | 6 | 9 = 6,
+): Uint8Array {
+  const entries: Zippable = {
+    [MANIFEST]: new TextEncoder().encode(`${JSON.stringify(manifest, null, 2)}\n`),
+  }
+  for (const [path, data] of Object.entries(files)) {
+    entries[path] = PRECOMPRESSED.test(path) ? [data, { level: 0 }] : data
+  }
+  return zipSync(entries, { level })
 }

@@ -16,6 +16,7 @@ export interface Songbook {
   /** Absolute manifest or .sbk URL, or a `local:` one; the book's identity. */
   url: string
   name: string
+  description?: string
   tabs: TabEntry[]
   /** Frees what the book holds in memory (a .sbk's blob URLs). Call when it is dropped. */
   release: () => void
@@ -49,14 +50,24 @@ export function shortBookUrl(url: string): string {
     : parsed.href
 }
 
-/** ASCII slug for songs whose manifest entry has no `id`: "Suite Nº1" -> "suite-no1". */
-function slugify(value: string): string {
+/** ASCII slug for ids and file names: "Suite Nº1" -> "suite-no1". */
+export function slugify(value: string): string {
   return value
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+/** Hands out unique ids: the second "air" becomes "air-2", the third "air-3". */
+export function idAllocator(): (base: string) => string {
+  const seen = new Map<string, number>()
+  return (base) => {
+    const count = (seen.get(base) ?? 0) + 1
+    seen.set(base, count)
+    return count === 1 ? base : `${base}-${count}`
+  }
 }
 
 function fileStem(url: URL): string {
@@ -80,7 +91,7 @@ function parseSongbook(json: unknown, bookUrl: string, resolveFrom: string): Son
   if (!isRecord(json)) throw new Error('not a songbook: expected a JSON object')
   if (!Array.isArray(json.songs)) throw new Error('not a songbook: missing a "songs" list')
 
-  const seen = new Map<string, number>()
+  const uniqueId = idAllocator()
   const tabs = json.songs.map((song, i): TabEntry => {
     const where = `song ${i + 1}`
     if (!isRecord(song)) throw new Error(`${where}: expected an object`)
@@ -99,11 +110,9 @@ function parseSongbook(json: unknown, bookUrl: string, resolveFrom: string): Son
 
     const stem = fileStem(url)
     const base = slugify(optionalString(song.id) ?? stem) || `song-${i + 1}`
-    const count = (seen.get(base) ?? 0) + 1
-    seen.set(base, count)
 
     return {
-      id: count === 1 ? base : `${base}-${count}`,
+      id: uniqueId(base),
       title: optionalString(song.title) ?? (stem || `Song ${i + 1}`),
       artist: optionalString(song.artist) ?? '',
       ext: url.pathname.split('.').pop()?.toLowerCase() ?? '',
@@ -114,6 +123,7 @@ function parseSongbook(json: unknown, bookUrl: string, resolveFrom: string): Son
   return {
     url: bookUrl,
     name: optionalString(json.name) ?? (new URL(bookUrl).hostname || 'Untitled songbook'),
+    description: optionalString(json.description),
     tabs,
     release: () => {},
   }
