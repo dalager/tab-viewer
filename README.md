@@ -1,10 +1,10 @@
-# tab-viewer
+# TabViewer
 
 A browser-based reader and player for a collection of Guitar Pro tablature,
 built on [alphaTab](https://www.alphatab.net/), React and Vite. Made for
 reading Bach at the guitar: page through a score with the keyboard, play it
 back at reduced speed on a nylon-string sound, and star the pieces you are
-working on.
+working on. It runs at <https://tabviewer.dalagerlabs.com>.
 
 ## Starting the app
 
@@ -73,14 +73,26 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 | `PageDown` / `PageUp`, `j` / `k` | Page or half-page through the score |
 | `n` / `p` | Next / previous piece |
 | `/` or `Ctrl+K` | Search the collection |
+| `c` | Copy a link to the current bar |
 | `Space`, `s` | Play / pause, stop |
-| `,` / `.` | Slower / faster |
+| `,` / `.` / `\` | Slower / faster / reset to 100% |
+| `m` | Toggle the metronome |
 | `g` | Play everything on nylon guitar |
 | `t` | Show all tracks / first track only |
+| `+` / `-` / `0` | Zoom in / out / reset |
 | `f`, `b`, `l` | Full screen, toggle sidebar, cycle layout |
 
-Click the star next to a piece in the sidebar to favourite it. Favourites and
+Click the star next to a piece in the sidebar to favourite it. Starred pieces
+are repeated in a *Starred* section at the top of the sidebar. Favourites and
 the last-opened piece are stored in the browser's `localStorage`.
+
+### Links to pieces and bars
+
+The address bar always holds a permanent link to the open piece, at
+`/p/<piece>`. Adding `?bar=<n>` opens the piece scrolled to that bar, with the
+playback cursor parked on it; bar numbers are the ones printed in the score.
+*Copy link* in the toolbar (or `c`) copies a link to the bar under the
+playback cursor, or else the first bar in view.
 
 ### Importing your own tabs
 
@@ -96,7 +108,8 @@ artist come from the file's own metadata, falling back to the file name.
 `.github/workflows/deploy.yml` builds on every push to `main` and deploys
 `dist/` as a static-assets Worker (`wrangler.jsonc`) with Wrangler. It is
 served at <https://tabviewer.dalagerlabs.com> (a Workers Custom Domain; the
-workers.dev URL is disabled). To deploy by hand, build with
+workers.dev URL is disabled). Unknown paths fall back to `index.html`, so
+deep links like `/p/<piece>` resolve. To deploy by hand, build with
 `VITE_SOUNDFONT_URL` set and run `npx wrangler deploy`.
 
 The soundfont is not deployed with the site: Workers static assets reject
