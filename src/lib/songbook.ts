@@ -29,13 +29,16 @@ export interface Songbook {
 const ZIP_ORIGIN = 'https://sbk.invalid'
 
 /**
- * Books offered with one click. The bundled Bach collection is built into
- * public/songbooks/ by scripts/build-manifest.mjs; this is the only place
- * the app knows it exists.
+ * Books offered with one click. The bundled Bach book lives in the repo as
+ * songbooks/bach-for-guitar.sbk and is published by scripts/copy-songbooks.mjs;
+ * this is the only place the app knows it exists.
  */
 export const SUGGESTED_SONGBOOKS = [
-  { name: 'Bach Guitar Songbook', url: '/songbooks/bach.sbk' },
+  { name: 'Bach Guitar Songbook', url: '/songbooks/bach-for-guitar.sbk' },
 ]
+
+/** Loaded on a visitor's very first visit, so the app does not open empty. */
+export const FIRST_VISIT_SONGBOOK = SUGGESTED_SONGBOOKS[0].url
 
 /** Resolve a user- or link-supplied book URL against this site. */
 export function absoluteBookUrl(url: string): string {

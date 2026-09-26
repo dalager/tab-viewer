@@ -25,13 +25,11 @@ dist-ssr
 
 # Generated build artifacts that land in the source tree.
 # alphatab-vite's copyAssetsPlugin writes into public/ (not dist/) at buildStart,
-# and scripts/build-manifest.mjs generates the rest. ~7.5 MB of binaries.
+# and scripts/copy-songbooks.mjs and fetch-soundfont.mjs fill in the rest.
 public/font
 public/soundfont
 public/songbooks
 
-# Scrape sources (download URLs) stay local; only index.csv is committed.
-collection/sources.csv
 
 # Playwright MCP session output
 .playwright-mcp

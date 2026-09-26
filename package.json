@@ -9,9 +9,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "manifest": "node scripts/build-manifest.mjs",
-    "predev": "npm run manifest && npm run soundfont",
-    "prebuild": "npm run manifest && npm run soundfont",
+    "songbooks": "node scripts/copy-songbooks.mjs",
+    "predev": "npm run songbooks && npm run soundfont",
+    "prebuild": "npm run songbooks && npm run soundfont",
     "soundfont": "node scripts/fetch-soundfont.mjs"
   },
   "dependencies": {
@@ -36,7 +36,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "csv-parse": "^7.0.2",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"

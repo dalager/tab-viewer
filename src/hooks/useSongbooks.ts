@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteLocalSongbook, isLocalBook, storeLocalSongbook } from '@/lib/localSongbooks'
 import { parseLocation } from '@/lib/permalink'
-import { absoluteBookUrl, fetchSongbook, type Songbook } from '@/lib/songbook'
+import {
+  absoluteBookUrl,
+  FIRST_VISIT_SONGBOOK,
+  fetchSongbook,
+  type Songbook,
+} from '@/lib/songbook'
 import { errorMessage } from '@/lib/utils'
 
 const ACTIVE_KEY = 'tab-viewer:songbook'
 const REMEMBERED_KEY = 'tab-viewer:songbooks'
+/** Set once the app has run in this browser; its absence means a first visit. */
+const VISITED_KEY = 'tab-viewer:visited'
 
 export interface RememberedBook {
   url: string
@@ -47,9 +54,20 @@ function loadRemembered(): RememberedBook[] {
   }
 }
 
-/** A `?book=` link wins over the book left open last session. */
+/**
+ * A `?book=` link wins over the book left open last session. A first visit
+ * with neither opens the bundled book; after that, an unloaded book stays
+ * unloaded. Browsers that used the app before this marker existed count as
+ * visited if they remember any book.
+ */
 function initialBookUrl(): string | null {
-  return parseLocation().book ?? localStorage.getItem(ACTIVE_KEY)
+  const firstVisit =
+    localStorage.getItem(VISITED_KEY) === null && localStorage.getItem(REMEMBERED_KEY) === null
+  return (
+    parseLocation().book ??
+    localStorage.getItem(ACTIVE_KEY) ??
+    (firstVisit ? FIRST_VISIT_SONGBOOK : null)
+  )
 }
 
 /** The active songbook and the history of ones loaded before, kept in localStorage. */
@@ -68,6 +86,10 @@ export function useSongbooks(): UseSongbooks {
   useEffect(() => {
     localStorage.setItem(REMEMBERED_KEY, JSON.stringify(remembered))
   }, [remembered])
+
+  useEffect(() => {
+    localStorage.setItem(VISITED_KEY, '1')
+  }, [])
 
   /**
    * Fetch and activate, ignoring the result if a newer request superseded it.

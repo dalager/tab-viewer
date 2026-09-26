@@ -26,8 +26,8 @@ Scope
 
 This license covers the source code of this project. It does not cover:
 
-- The Guitar Pro files in collection/tabs/, which remain under whatever terms
-  their original transcribers and publishers set.
+- The Guitar Pro files packed in songbooks/bach-for-guitar.sbk, which remain
+  under whatever terms their original transcribers and publishers set.
 - Third-party dependencies, which keep their own licenses. In particular,
   alphaTab (https://github.com/CoderLine/alphaTab) is licensed under the
   Mozilla Public License 2.0; its code is included, unmodified, in the built

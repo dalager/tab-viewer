@@ -18,11 +18,8 @@ Then open http://localhost:5173/. Node.js 20 or newer is required.
 
 `npm run dev` (and `npm run build`) first run two preparation scripts:
 
-- **`npm run manifest`** builds the bundled *Bach Guitar Songbook*: it copies
-  every file from `collection/tabs/` into `public/songbooks/bach/tabs/` under
-  an ASCII slug name, writes `public/songbooks/bach/songbook.json`, and packs
-  both into `public/songbooks/bach.sbk`. Reruns are instant; only changed
-  files are copied.
+- **`npm run songbooks`** copies every `.sbk` in `songbooks/` into
+  `public/songbooks/`, where the app serves them.
 - **`npm run soundfont`** downloads the MuseScore_General soundfont (~40 MB,
   one time) into `public/soundfont/`. Playback uses it instead of alphaTab's
   bundled feature-phone bank. If the download fails, it falls back to the
@@ -53,6 +50,13 @@ so a folder holding `songbook.json` and its files is a complete songbook.
 A songbook on another host must be served with CORS headers that allow `GET`
 from the viewer's origin.
 
+A first visit opens the bundled *Bach Guitar Songbook*. After that the app
+opens whatever book was loaded last, or nothing if it was unloaded. Press `o`
+or click *Songbook* in the toolbar to paste a URL, open a `.sbk` file, or pick
+the bundled book again. One songbook is loaded at a time; the loaded one and
+every one loaded before are remembered in `localStorage`, and can be switched
+between, unloaded, forgotten or cleared from the same dialog.
+
 ### .sbk files
 
 A `.sbk` is the same thing zipped: `songbook.json` at the root (or inside a
@@ -77,47 +81,26 @@ name and an optional description, then either *Download .sbk* to share it, or
 *Save & open* to keep it in this browser and switch to it. Pieces are renamed
 after their titles inside the file, so imports get readable ids.
 
-A first visit starts empty. Press `o` or click *Songbook* in the toolbar to
-paste a URL, open a `.sbk` file, or pick the bundled *Bach Guitar Songbook*
-(served as `bach.sbk`). One songbook is loaded
-at a time; the loaded one and every one loaded before are remembered in
-`localStorage`, and can be switched between, unloaded, forgotten or cleared
-from the same dialog. The bundled book is listed in `SUGGESTED_SONGBOOKS` in
-`src/lib/songbook.ts`.
+## The bundled songbook
 
-## The bundled collection
+The Bach collection lives in the repo as a single file,
+`songbooks/bach-for-guitar.sbk`: 100 Guitar Pro files (`.gp3` / `.gp4` /
+`.gp5`) and their `songbook.json`. `npm run songbooks` publishes it, and
+`SUGGESTED_SONGBOOKS` in `src/lib/songbook.ts` offers it (and opens it on a
+first visit). Any `.sbk` dropped into `songbooks/` is published the same way.
 
-The tabs for the bundled songbook live in the repo:
+To change the book, open it in the app, adjust it and export a new `.sbk`, or
+edit it by hand:
 
-```
-collection/
-├── index.csv                one row per piece
-├── sources.csv              download URLs, git-ignored
-└── tabs/                    the .gp3 / .gp4 / .gp5 files
-```
-
-`index.csv` has these columns:
-
-```
-artist,song,filename
-Bach,4 Canons,Bach - 4 Canons.gp5
+```sh
+mkdir bach && cd bach && unzip ../songbooks/bach-for-guitar.sbk
+# edit songbook.json, add or replace files under tabs/
+rm ../songbooks/bach-for-guitar.sbk   # zip would otherwise keep removed files
+zip -r -X ../songbooks/bach-for-guitar.sbk songbook.json tabs
 ```
 
-`filename` must match a file in `collection/tabs/`. The manifest build fails
-loudly if the CSV references a missing file, or if a file on disk has no CSV
-row, so the two cannot silently drift apart. Any collection in this shape
-works; it does not have to be Bach.
-
-`sources.csv` records where each file was downloaded from and is kept out of
-git:
-
-```
-filename,song_id,url
-Bach - 4 Canons.gp5,412315,https://…/DownloadSong?Type=1&SongId=412315
-```
-
-`scripts/download-tabs.sh` fetches every `url` in it into `collection/tabs/`,
-skipping files already present. It needs `python3` and `curl`.
+Keep each song's `id` when editing: it is the stem of links like `/p/air`,
+and it is what favourites are stored by.
 
 ## Using it
 
