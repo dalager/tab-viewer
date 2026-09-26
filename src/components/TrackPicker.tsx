@@ -1,4 +1,5 @@
 import type * as alphaTab from '@coderline/alphatab'
+import { Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -52,8 +53,21 @@ export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" disabled={tracks.length === 0} title="Tracks (t)">
-          {label}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={tracks.length === 0}
+          aria-label={`Tracks: ${label}`}
+          title={`Tracks: ${label} (t)`}
+          className="px-1.5 tabular-nums"
+        >
+          <Layers className="size-4" />
+          {/* The count shows only when some tracks are hidden, like speed off 100%. */}
+          {!isAll && (
+            <span className="text-xs">
+              {activeCount}/{tracks.length}
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-0">

@@ -1,9 +1,32 @@
-import type * as alphaTab from '@coderline/alphatab'
+import * as alphaTab from '@coderline/alphatab'
+import {
+  BookOpen,
+  Check,
+  CircleHelp,
+  FileText,
+  Guitar,
+  Link,
+  type LucideIcon,
+  Maximize,
+  Metronome,
+  Minimize,
+  MoveHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pause,
+  Play,
+  Search,
+  Square,
+  Upload,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { AppIcon } from '@/components/AppIcon'
 import { SpeedControl } from '@/components/SpeedControl'
 import { TrackPicker } from '@/components/TrackPicker'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import { LAYOUT_LABELS } from '@/score/settings'
 import type { TabEntry } from '@/types'
 
@@ -36,6 +59,8 @@ interface ToolbarProps {
   onImport: () => void
   /** Name of the loaded songbook, or null when none is. */
   bookName: string | null
+  /** Its description, shown when hovering the name. */
+  bookDescription: string | null
   onOpenSongbooks: () => void
   linkCopied: boolean
   /** Why the open piece cannot be linked, or null when it can. */
@@ -43,20 +68,67 @@ interface ToolbarProps {
   onCopyLink: () => void
 }
 
+interface ToolButtonProps {
+  icon: LucideIcon
+  /** Accessible name, and the start of the tooltip. */
+  label: string
+  /** Key hint appended to the tooltip, e.g. "Space". */
+  shortcut?: string
+  /** Replaces the whole tooltip, e.g. to say why the button is disabled. */
+  title?: string
+  onClick: () => void
+  disabled?: boolean
+  /** For on/off toggles: shown pressed, and announced as such. */
+  pressed?: boolean
+}
+
+function ToolButton({
+  icon: Icon,
+  label,
+  shortcut,
+  title,
+  onClick,
+  disabled,
+  pressed,
+}: ToolButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={pressed}
+      title={title ?? (shortcut ? `${label} (${shortcut})` : label)}
+      className={cn(
+        pressed === false && 'text-neutral-400',
+        pressed === true && 'bg-neutral-200 text-neutral-900',
+      )}
+    >
+      <Icon className="size-4" />
+    </Button>
+  )
+}
+
 export function Toolbar(props: ToolbarProps) {
   const { tab, tracks, scale, layoutMode } = props
+  const horizontal = layoutMode === alphaTab.LayoutMode.Horizontal
+  const playerOff = !props.isPlayerReady
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3">
-      <AppIcon className="size-7 shrink-0 text-neutral-900" />
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-neutral-200 bg-white px-3">
+      <AppIcon className="mr-1 size-7 shrink-0 text-neutral-900" />
 
-      <Button variant="ghost" size="sm" onClick={props.onToggleSidebar} title="Toggle sidebar (b)">
-        {props.sidebarOpen ? 'Hide list' : 'Show list'}
-      </Button>
+      <ToolButton
+        icon={props.sidebarOpen ? PanelLeftClose : PanelLeftOpen}
+        label={props.sidebarOpen ? 'Hide list' : 'Show list'}
+        shortcut="b"
+        onClick={props.onToggleSidebar}
+      />
 
-      <Separator orientation="vertical" className="h-6" />
+      <Separator orientation="vertical" className="mx-1 h-6" />
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 px-1">
         <h1 className="truncate text-sm font-medium text-neutral-900">
           {tab?.title ?? 'Select a piece'}
         </h1>
@@ -67,132 +139,122 @@ export function Toolbar(props: ToolbarProps) {
         )}
       </div>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={props.onOpenSongbooks}
-        title="Load, switch or unload a songbook (o)"
-        className="max-w-48"
-      >
-        <span className="truncate">{props.bookName ?? 'Songbook'}</span>
-      </Button>
-
-      <Button variant="ghost" size="sm" onClick={props.onOpenPalette} title="Search (Ctrl+K)">
-        Search
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="sm"
+      {props.bookName ? (
+        // The full name, now that the other controls are icons; the
+        // description (if any) is its tooltip.
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={props.onOpenSongbooks}
+          title={`${props.bookDescription ?? props.bookName}\n\nSwitch or unload songbooks (o)`}
+          className="shrink-0"
+        >
+          <BookOpen className="size-4" />
+          {props.bookName}
+        </Button>
+      ) : (
+        <ToolButton
+          icon={BookOpen}
+          label="Load a songbook"
+          shortcut="o"
+          onClick={props.onOpenSongbooks}
+        />
+      )}
+      <ToolButton icon={Search} label="Search" shortcut="Ctrl+K" onClick={props.onOpenPalette} />
+      <ToolButton
+        icon={Upload}
+        label="Import"
+        title="Import Guitar Pro files or a .sbk (i), or drop them anywhere"
         onClick={props.onImport}
-        title="Import Guitar Pro files (i), or drop them anywhere"
-      >
-        Import
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="sm"
+      />
+      <ToolButton
+        icon={props.linkCopied ? Check : Link}
+        label={props.linkCopied ? 'Link copied' : 'Copy link'}
+        title={props.linkBlocked ?? 'Copy link to this bar (c)'}
         onClick={props.onCopyLink}
         disabled={props.linkBlocked !== null}
-        title={props.linkBlocked ?? 'Copy link to this bar (c)'}
-      >
-        {props.linkCopied ? 'Copied' : 'Copy link'}
-      </Button>
+      />
 
-      <Separator orientation="vertical" className="h-6" />
+      <Separator orientation="vertical" className="mx-1 h-6" />
 
       <TrackPicker
         tracks={tracks}
         selected={props.selectedTracks}
         onChange={props.onTracksChange}
       />
+      <ToolButton
+        icon={horizontal ? MoveHorizontal : FileText}
+        label={`Layout: ${LAYOUT_LABELS[layoutMode] ?? 'Page'}`}
+        shortcut="l"
+        onClick={props.onCycleLayout}
+      />
 
-      <Button variant="ghost" size="sm" onClick={props.onCycleLayout} title="Cycle layout (l)">
-        {LAYOUT_LABELS[layoutMode] ?? 'Page'}
-      </Button>
+      <Separator orientation="vertical" className="mx-1 h-6" />
 
-      <Separator orientation="vertical" className="h-6" />
-
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" onClick={() => props.onZoom(-0.1)} title="Zoom out (-)">
-          −
-        </Button>
-        <button
-          type="button"
-          onClick={props.onResetZoom}
-          className="w-12 text-center text-xs tabular-nums text-neutral-600 hover:text-neutral-900"
-          title="Reset zoom (0)"
-        >
-          {Math.round(scale * 100)}%
-        </button>
-        <Button variant="ghost" size="sm" onClick={() => props.onZoom(0.1)} title="Zoom in (+)">
-          +
-        </Button>
-      </div>
-
-      <Separator orientation="vertical" className="h-6" />
-
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={props.onPlayPause}
-          disabled={!props.isPlayerReady}
-          title="Play / pause (Space)"
-        >
-          {props.isPlaying ? 'Pause' : 'Play'}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={props.onStop}
-          disabled={!props.isPlayerReady}
-          title="Stop (s)"
-        >
-          Stop
-        </Button>
-        <SpeedControl
-          speed={props.speed}
-          onChange={props.onSpeedChange}
-          disabled={!props.isPlayerReady}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={props.onToggleMetronome}
-          disabled={!props.isPlayerReady}
-          title="Metronome (m)"
-          className={props.metronome ? 'text-neutral-900' : 'text-neutral-400'}
-        >
-          Metronome
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={props.onToggleGuitarOnly}
-          disabled={!props.isPlayerReady}
-          title="Play everything on nylon guitar (g)"
-          className={props.guitarOnly ? 'text-neutral-900' : 'text-neutral-400'}
-        >
-          As guitar
-        </Button>
-      </div>
-
-      <Separator orientation="vertical" className="h-6" />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={props.onToggleFullscreen}
-        title="Toggle fullscreen (f)"
+      <ToolButton
+        icon={ZoomOut}
+        label="Zoom out"
+        shortcut="-"
+        onClick={() => props.onZoom(-0.1)}
+      />
+      <button
+        type="button"
+        onClick={props.onResetZoom}
+        className="w-11 text-center text-xs tabular-nums text-neutral-600 hover:text-neutral-900"
+        title="Reset zoom (0)"
       >
-        {props.isFullscreen ? 'Exit full screen' : 'Full screen'}
-      </Button>
+        {Math.round(scale * 100)}%
+      </button>
+      <ToolButton icon={ZoomIn} label="Zoom in" shortcut="+" onClick={() => props.onZoom(0.1)} />
 
-      <Button variant="ghost" size="sm" onClick={props.onOpenHelp} title="Shortcuts (?)">
-        ?
-      </Button>
+      <Separator orientation="vertical" className="mx-1 h-6" />
+
+      <ToolButton
+        icon={props.isPlaying ? Pause : Play}
+        label={props.isPlaying ? 'Pause' : 'Play'}
+        shortcut="Space"
+        onClick={props.onPlayPause}
+        disabled={playerOff}
+      />
+      <ToolButton
+        icon={Square}
+        label="Stop"
+        shortcut="s"
+        onClick={props.onStop}
+        disabled={playerOff}
+      />
+      <SpeedControl speed={props.speed} onChange={props.onSpeedChange} disabled={playerOff} />
+      <ToolButton
+        icon={Metronome}
+        label="Metronome"
+        shortcut="m"
+        onClick={props.onToggleMetronome}
+        disabled={playerOff}
+        pressed={props.metronome}
+      />
+      <ToolButton
+        icon={Guitar}
+        label="Play everything on nylon guitar"
+        shortcut="g"
+        onClick={props.onToggleGuitarOnly}
+        disabled={playerOff}
+        pressed={props.guitarOnly}
+      />
+
+      <Separator orientation="vertical" className="mx-1 h-6" />
+
+      <ToolButton
+        icon={props.isFullscreen ? Minimize : Maximize}
+        label={props.isFullscreen ? 'Exit full screen' : 'Full screen'}
+        shortcut="f"
+        onClick={props.onToggleFullscreen}
+      />
+      <ToolButton
+        icon={CircleHelp}
+        label="Keyboard shortcuts"
+        shortcut="?"
+        onClick={props.onOpenHelp}
+      />
     </header>
   )
 }

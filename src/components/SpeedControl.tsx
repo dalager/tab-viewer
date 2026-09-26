@@ -1,3 +1,4 @@
+import { Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
@@ -22,10 +23,12 @@ export function SpeedControl({ speed, onChange, disabled }: SpeedControlProps) {
           variant="ghost"
           size="sm"
           disabled={disabled}
-          title="Playback speed (, and .)"
-          className={cn('tabular-nums', isSlow && 'text-amber-700')}
+          aria-label={`Playback speed ${percent(speed)}`}
+          title={`Playback speed ${percent(speed)} (, and .)`}
+          className={cn('px-1.5 tabular-nums', isSlow && 'text-amber-700')}
         >
-          Speed {percent(speed)}
+          <Gauge className="size-4" />
+          {speed !== 1 && <span className="text-xs">{percent(speed)}</span>}
         </Button>
       </PopoverTrigger>
 

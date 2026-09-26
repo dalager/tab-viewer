@@ -466,6 +466,7 @@ export default function App() {
         onOpenHelp={openOverlay('help')}
         onImport={openImportDialog}
         bookName={book?.name ?? null}
+        bookDescription={book?.description ?? null}
         onOpenSongbooks={openOverlay('songbooks')}
         linkCopied={linkCopied}
         linkBlocked={linkBlocked}
