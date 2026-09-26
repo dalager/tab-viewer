@@ -1,10 +1,11 @@
 # TabViewer
 
 A browser-based reader and player for Guitar Pro tablature, built on
-[alphaTab](https://www.alphatab.net/), React and Vite. Made for reading Bach at
-the guitar: page through a score with the keyboard, play it back at reduced
-speed on a nylon-string sound, and star the pieces you are working on. Pieces
-come from *songbooks*, JSON manifests that can be hosted anywhere.
+[alphaTab](https://www.alphatab.net/), React and Vite. 
+
+Made for reading tabs in the cleanest way possible in a browser with no distractions.
+
+Tabs can be imported as files, and organized in *songbooks*, exported as `.sbk` files (just zip files with json and tab files in it).
 
 Try it at <https://tabviewer.dalagerlabs.com>, or deploy your own copy (see
 [Deploying](#deploying)).
