@@ -100,7 +100,7 @@ after their titles inside the file, so imports get readable ids.
 ## The bundled songbook
 
 The Bach collection lives in the repo as a single file,
-`songbooks/bach-for-guitar.sbk`: 100 Guitar Pro files (`.gp3` / `.gp4` /
+`songbooks/bach-for-guitar.sbk`: 3 Guitar Pro files (`.gp3` / `.gp4` /
 `.gp5`) and their `songbook.json`. `npm run songbooks` publishes it, and
 `SUGGESTED_SONGBOOKS` in `src/lib/songbook.ts` offers it (and opens it on a
 first visit). Any `.sbk` dropped into `songbooks/` is published the same way.
