@@ -1,10 +1,10 @@
 /**
  * Packs pieces into a new .sbk: a songbook.json listing them plus each file
- * under tabs/, the same layout scripts/build-manifest.mjs produces.
+ * under tabs/, the same layout as the bundled songbooks/*.sbk.
  */
 
 import { packSongbook } from '@/lib/sbk'
-import { idAllocator, slugify } from '@/lib/songbook'
+import { idAllocator, SONGBOOK_SCHEMA, SONGBOOK_VERSION, slugify } from '@/lib/songbook'
 import { errorMessage, fetchBytes } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
@@ -46,7 +46,8 @@ export async function exportSongbook({
   })
 
   const manifest = {
-    songbook: 1,
+    $schema: SONGBOOK_SCHEMA,
+    songbook: SONGBOOK_VERSION,
     name: title,
     ...(description.trim() && { description: description.trim() }),
     songs,

@@ -12,7 +12,8 @@
     "songbooks": "node scripts/copy-songbooks.mjs",
     "predev": "npm run songbooks && npm run soundfont",
     "prebuild": "npm run songbooks && npm run soundfont",
-    "soundfont": "node scripts/fetch-soundfont.mjs"
+    "soundfont": "node scripts/fetch-soundfont.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@coderline/alphatab": "^1.8.4",
@@ -36,8 +37,11 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
   }
 }

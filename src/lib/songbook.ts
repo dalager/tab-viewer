@@ -6,6 +6,7 @@
  * Song URLs resolve against the manifest's own URL, so a folder holding
  * songbook.json and its files is a complete, self-contained songbook. The
  * same folder zipped is a .sbk (see sbk.ts), which loads in one request.
+ * The format is specified by public/schema/songbook-1.schema.json.
  */
 
 import { isLocalBook, readLocalSongbook } from '@/lib/localSongbooks'
@@ -27,6 +28,12 @@ export interface Songbook {
  * still land on it are zip entries, and any that do not are ordinary links.
  */
 const ZIP_ORIGIN = 'https://sbk.invalid'
+
+/** The manifest format this app reads and writes, the manifest's `songbook` field. */
+export const SONGBOOK_VERSION = 1
+
+/** Where the schema for that format is published; exported manifests point at it. */
+export const SONGBOOK_SCHEMA = 'https://tabviewer.dalagerlabs.com/schema/songbook-1.schema.json'
 
 /**
  * Books offered with one click. The bundled Bach book lives in the repo as
@@ -90,8 +97,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Validate a parsed manifest and turn its songs into sidebar entries. Song
  * URLs resolve against `resolveFrom`, which is the book URL except inside a .sbk.
  */
-function parseSongbook(json: unknown, bookUrl: string, resolveFrom: string): Songbook {
+export function parseSongbook(json: unknown, bookUrl: string, resolveFrom: string): Songbook {
   if (!isRecord(json)) throw new Error('not a songbook: expected a JSON object')
+  // A missing version is 1: early manifests left it out.
+  const version = json.songbook === undefined ? SONGBOOK_VERSION : json.songbook
+  if (version !== SONGBOOK_VERSION) {
+    throw new Error(
+      Number.isInteger(version) && (version as number) > SONGBOOK_VERSION
+        ? `songbook format ${version} is newer than this app understands (format ${SONGBOOK_VERSION}); update the app`
+        : `not a songbook: unknown format ${JSON.stringify(version)}`,
+    )
+  }
   if (!Array.isArray(json.songs)) throw new Error('not a songbook: missing a "songs" list')
 
   const uniqueId = idAllocator()

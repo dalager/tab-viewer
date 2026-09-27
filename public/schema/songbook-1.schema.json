@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tabviewer.dalagerlabs.com/schema/songbook-1.schema.json",
+  "title": "Songbook manifest, version 1",
+  "description": "A songbook.json: a named list of Guitar Pro files. Served on its own, song URLs resolve against the manifest's URL; inside a .sbk zip they resolve against the folder holding songbook.json. Extensions go in properties prefixed with \"x-\", which readers ignore.",
+  "type": "object",
+  "required": ["songbook", "name", "songs"],
+  "properties": {
+    "$schema": {
+      "description": "URI of this schema, so editors can validate the file.",
+      "type": "string",
+      "format": "uri"
+    },
+    "songbook": {
+      "description": "Format version. An incompatible future format will use a new number.",
+      "const": 1
+    },
+    "name": {
+      "description": "Display name of the songbook.",
+      "$ref": "#/$defs/text"
+    },
+    "description": {
+      "description": "One or two sentences about the songbook.",
+      "$ref": "#/$defs/text"
+    },
+    "songs": {
+      "description": "The pieces, in display order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/song" }
+    }
+  },
+  "patternProperties": {
+    "^x-": true
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "description": "A string with at least one non-whitespace character. Readers trim it.",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "song": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "description": "Where the Guitar Pro file (.gp3, .gp4, .gp5, .gpx or .gp) is: a relative reference, resolved as described above, or an absolute http(s) URL. Other schemes are rejected.",
+          "type": "string",
+          "format": "uri-reference",
+          "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]?:|(?![A-Za-z][A-Za-z0-9+.\\-]*:))\\S(?:.*\\S)?$",
+          "examples": ["tabs/air.gp5", "https://example.com/tabs/air.gp5"]
+        },
+        "id": {
+          "description": "Stable slug used in links (/p/<id>) and to store favourites; keep it when editing the book. Should be unique within the songbook: readers suffix repeats (\"air\", \"air-2\"). Defaults to a slug of the file name.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "examples": ["air", "suite-no1-prelude"]
+        },
+        "title": {
+          "description": "Display title. Defaults to the file name without its extension.",
+          "$ref": "#/$defs/text"
+        },
+        "artist": {
+          "description": "Composer or performer.",
+          "$ref": "#/$defs/text"
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    }
+  },
+  "examples": [
+    {
+      "$schema": "https://tabviewer.dalagerlabs.com/schema/songbook-1.schema.json",
+      "songbook": 1,
+      "name": "Bach Guitar Songbook",
+      "description": "Pieces by J. S. Bach arranged for guitar.",
+      "songs": [{ "id": "air", "title": "Air", "artist": "Bach", "url": "tabs/air.gp5" }]
+    }
+  ]
+}

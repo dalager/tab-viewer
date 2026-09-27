@@ -53,6 +53,19 @@ so a folder holding `songbook.json` and its files is a complete songbook.
 A songbook on another host must be served with CORS headers that allow `GET`
 from the viewer's origin.
 
+The format is specified by a JSON Schema at
+[`public/schema/songbook-1.schema.json`](public/schema/songbook-1.schema.json),
+served at <https://tabviewer.dalagerlabs.com/schema/songbook-1.schema.json>.
+Add `"$schema"` with that URL to a manifest to have editors validate it (exported
+books include it). Custom properties go in keys starting with `x-`; any other
+unknown key is an error. `songbook` is the format version: a manifest without
+it is read as version 1, and the app refuses any version it does not know.
+
+`songbook-1.schema.json` is frozen: it only gets changes that older readers can
+ignore. A format that older readers would misread gets a new schema file and a
+new `songbook` number. `npm test` checks every bundled `.sbk` and the exporter's
+output against the schema, and CI runs it on every push.
+
 A first visit opens the bundled *Bach Guitar Songbook*. After that the app
 opens whatever book was loaded last, or nothing if it was unloaded. Press `o`
 or click *Songbook* in the toolbar to paste a URL, open a `.sbk` file, or pick
@@ -103,7 +116,8 @@ zip -r -X ../songbooks/bach-for-guitar.sbk songbook.json tabs
 ```
 
 Keep each song's `id` when editing: it is the stem of links like `/p/air`,
-and it is what favourites are stored by.
+and it is what favourites are stored by. Run `npm test` afterwards: it checks
+the edited `songbook.json` against the schema and for repeated ids.
 
 ### About the transcriptions
 
@@ -207,8 +221,8 @@ To deploy from GitHub on every push to `main`, fork the repo and, under
   `DEPLOY_DOMAIN` to serve the Worker on a custom domain in the same Cloudflare
   account instead of workers.dev.
 
-Without `CLOUDFLARE_DEPLOY`, the workflow only lints and builds, which also
-runs on pull requests.
+Without `CLOUDFLARE_DEPLOY`, the workflow only lints, tests and builds, which
+also runs on pull requests.
 
 ### Any other static server
 
@@ -226,4 +240,5 @@ or, with nginx, `try_files $uri /index.html;` in the site's `location /`.
 npm run build     # production build into dist/
 npm run preview   # serve the production build locally
 npm run lint      # oxlint
+npm test          # vitest: the songbook schema checks in tests/
 ```

@@ -1,6 +1,6 @@
 name: Build and deploy
 
-# Every push and pull request is linted and built. Deploying to Cloudflare
+# Every push and pull request is linted, tested and built. Deploying to Cloudflare
 # Workers is opt-in, so forks stay green: set the repository variable
 # CLOUDFLARE_DEPLOY to "true" and add the CLOUDFLARE_API_TOKEN and
 # CLOUDFLARE_ACCOUNT_ID secrets. See "Deploying" in the README.
@@ -31,6 +31,9 @@ jobs:
       - run: npm ci
 
       - run: npm run lint
+
+      # Holds the bundled songbooks and the exporter to the songbook schema.
+      - run: npm test
 
       # The 40 MB soundfont is over Cloudflare's 25 MiB per-file limit, so
       # playback uses SOUNDFONT_URL (a hosted copy) or else the small bank
