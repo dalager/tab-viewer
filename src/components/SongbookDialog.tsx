@@ -1,4 +1,4 @@
-import { BookOpen, X } from 'lucide-react'
+import { BookOpen, Download, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { UseSongbooks } from '@/hooks/useSongbooks'
+import { downloadFile, exportSongbook } from '@/lib/exportSongbook'
 import { isLocalBook } from '@/lib/localSongbooks'
 import { absoluteBookUrl, type Songbook, SUGGESTED_SONGBOOKS } from '@/lib/songbook'
-import { cn } from '@/lib/utils'
+import { cn, errorMessage } from '@/lib/utils'
 
 interface SongbookPickerProps {
   songbooks: UseSongbooks
@@ -42,6 +43,27 @@ function SectionLabel({ children }: { children: string }) {
 export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPickerProps) {
   const { active, remembered, loading, error, load, unload, forget, clearAll } = songbooks
   const [url, setUrl] = useState('')
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  /** Packs the loaded book into a fresh .sbk, whatever form it was loaded in. */
+  const download = async (book: Songbook) => {
+    setDownloading(true)
+    setDownloadError(null)
+    try {
+      const file = await exportSongbook({
+        name: book.name,
+        description: book.description ?? '',
+        tabs: book.tabs,
+        compress: true,
+      })
+      downloadFile(file)
+    } catch (e) {
+      setDownloadError(`Could not download: ${errorMessage(e)}`)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const open = async (target: string) => {
     const book = await load(target)
@@ -69,10 +91,23 @@ export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPick
                 {active.tabs.length} pieces · {describeUrl(active.url)}
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={downloading}
+              onClick={() => void download(active)}
+              title="Save this songbook as a .sbk file"
+            >
+              <Download />
+              {downloading ? 'Packing…' : 'Download'}
+            </Button>
             <Button variant="outline" size="sm" onClick={unload}>
               Unload
             </Button>
           </div>
+          {downloadError && (
+            <p className="mt-2 text-xs whitespace-pre-line text-red-700">{downloadError}</p>
+          )}
         </section>
       )}
 
