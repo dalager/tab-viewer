@@ -17,6 +17,8 @@ interface ShortcutHelpProps {
 const REPO_URL = 'https://github.com/dalager/tab-viewer'
 const ALPHATAB_URL = 'https://github.com/CoderLine/alphaTab'
 const MPL_URL = 'https://www.mozilla.org/MPL/2.0/'
+const GIT_SHA: string = import.meta.env.VITE_GIT_SHA
+const BUILD_TIME: string = import.meta.env.VITE_BUILD_TIME
 
 /** Renders the same SHORTCUTS array the handler uses, so the two cannot drift. */
 export function ShortcutHelp({ shortcuts, open, onOpenChange }: ShortcutHelpProps) {
@@ -59,27 +61,41 @@ export function ShortcutHelp({ shortcuts, open, onOpenChange }: ShortcutHelpProp
         </div>
 
         <div className="flex items-center justify-between gap-4 border-t border-neutral-200 pt-3">
-          <p className="text-xs text-neutral-500">
-            Scores rendered and played with{' '}
-            <a
-              href={ALPHATAB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-neutral-900"
-            >
-              alphaTab
-            </a>
-            , licensed under{' '}
-            <a
-              href={MPL_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-neutral-900"
-            >
-              MPL-2.0
-            </a>
-            .
-          </p>
+          <div className="space-y-1 text-xs text-neutral-500">
+            <p>
+              Scores rendered and played with{' '}
+              <a
+                href={ALPHATAB_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-neutral-900"
+              >
+                alphaTab
+              </a>
+              , licensed under{' '}
+              <a
+                href={MPL_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-neutral-900"
+              >
+                MPL-2.0
+              </a>
+              .
+            </p>
+            <p>
+              Build{' '}
+              <a
+                href={`${REPO_URL}/commit/${GIT_SHA}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono underline underline-offset-2 hover:text-neutral-900"
+              >
+                {GIT_SHA}
+              </a>{' '}
+              · <time dateTime={BUILD_TIME}>{BUILD_TIME.slice(0, 16).replace('T', ' ')} UTC</time>
+            </p>
+          </div>
           <a
             href={REPO_URL}
             target="_blank"
