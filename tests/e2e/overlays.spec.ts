@@ -38,6 +38,25 @@ test('shortcuts are ignored while an overlay is open', async ({ page }) => {
   await expectOpenPiece(page, CELLO)
 })
 
+test('? is typed into text fields rather than opening the help', async ({ page }) => {
+  await openApp(page)
+  const filter = page.getByRole('textbox', { name: 'Filter pieces' })
+  await filter.click()
+  await page.keyboard.type('cello?')
+  await expect(filter).toHaveValue('cello?')
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveCount(0)
+
+  await filter.fill('')
+  await filter.blur()
+  await page.keyboard.press('/')
+  const palette = page.getByRole('dialog', { name: 'Find a piece' })
+  const search = palette.getByPlaceholder('Search pieces…')
+  await page.keyboard.type('what?')
+  await expect(search).toHaveValue('what?')
+  await expect(palette).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveCount(0)
+})
+
 test('/ opens the search palette and Enter opens the match', async ({ page }) => {
   await openApp(page)
   await page.keyboard.press('/')

@@ -9,7 +9,7 @@ export interface Shortcut<A extends string = string> {
   group: string
   /** Requires Ctrl/Cmd (the sole exception to the modifier guard). */
   withCtrl?: boolean
-  /** Still fires while a dialog is open (Escape only). */
+  /** Still fires while a dialog is open (Escape and ?). */
   allowInOverlay?: boolean
   /** Name of the action to run; the caller supplies the implementations. */
   action: A
@@ -19,6 +19,29 @@ function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   const tag = target.tagName.toLowerCase()
   return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable
+}
+
+/**
+ * The shortcut a key press triggers, or undefined when none applies: typing in
+ * a field and holding Ctrl/Cmd/Alt suppress shortcuts that do not opt in.
+ */
+export function matchShortcut<A extends string>(
+  shortcuts: readonly Shortcut<A>[],
+  event: Pick<KeyboardEvent, 'key' | 'target' | 'ctrlKey' | 'metaKey' | 'altKey'>,
+  overlayOpen: boolean,
+): Shortcut<A> | undefined {
+  const typing = isTypingTarget(event.target)
+  const modified = event.ctrlKey || event.metaKey || event.altKey
+
+  return shortcuts.find((shortcut) => {
+    if (!shortcut.keys.includes(event.key)) return false
+    if (shortcut.withCtrl && !(event.ctrlKey || event.metaKey)) return false
+    if (!shortcut.withCtrl && modified) return false
+    if (overlayOpen && !shortcut.allowInOverlay) return false
+    // Only Escape leaves a field: ? works in overlays but must still type a ?.
+    if (typing && !shortcut.withCtrl && event.key !== 'Escape') return false
+    return true
+  })
 }
 
 /**
@@ -43,20 +66,11 @@ export function useHotkeys<A extends string>(
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const { actions, overlayOpen } = latest.current
-      const typing = isTypingTarget(event.target)
-      const modified = event.ctrlKey || event.metaKey || event.altKey
+      const shortcut = matchShortcut(shortcuts, event, overlayOpen)
+      if (!shortcut) return
 
-      for (const shortcut of shortcuts) {
-        if (!shortcut.keys.includes(event.key)) continue
-        if (shortcut.withCtrl && !(event.ctrlKey || event.metaKey)) continue
-        if (!shortcut.withCtrl && modified) continue
-        if (overlayOpen && !shortcut.allowInOverlay) continue
-        if (typing && !shortcut.allowInOverlay && !shortcut.withCtrl) continue
-
-        event.preventDefault()
-        actions[shortcut.action]()
-        return
-      }
+      event.preventDefault()
+      actions[shortcut.action]()
     }
 
     window.addEventListener('keydown', onKeyDown)
