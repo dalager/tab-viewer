@@ -191,15 +191,6 @@ To ship your own songbooks, put `.sbk` files in `songbooks/` and list them in
 `SUGGESTED_SONGBOOKS` in `src/lib/songbook.ts`; the first entry is the one a
 first visit opens.
 
-### Netlify or Vercel
-
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/dalager/tab-viewer)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/dalager/tab-viewer)
-
-Both read their settings from the repo (`netlify.toml`, `vercel.json`): build
-command, output directory and the `index.html` fallback. The full soundfont is
-deployed as is.
-
 ### Cloudflare Workers
 
 `wrangler.jsonc` deploys `dist/` as a static-assets Worker, served at
