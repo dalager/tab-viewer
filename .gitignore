@@ -35,3 +35,9 @@ public/songbooks
 .playwright-mcp
 test-results
 playwright-report
+
+# AI tooling (Agentic QE, Claude Code): local to each developer, not part of the repo
+.agentic-qe/
+.claude/
+.mcp.json
+CLAUDE.md
