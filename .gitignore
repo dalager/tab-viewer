@@ -31,5 +31,7 @@ public/soundfont
 public/songbooks
 
 
-# Playwright MCP session output
+# Playwright
 .playwright-mcp
+test-results
+playwright-report

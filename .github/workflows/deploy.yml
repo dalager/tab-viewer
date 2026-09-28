@@ -1,9 +1,10 @@
 name: Build and deploy
 
-# Every push and pull request is linted, tested and built. Deploying to Cloudflare
-# Workers is opt-in, so forks stay green: set the repository variable
-# CLOUDFLARE_DEPLOY to "true" and add the CLOUDFLARE_API_TOKEN and
-# CLOUDFLARE_ACCOUNT_ID secrets. See "Deploying" in the README.
+# Every push and pull request is linted, unit tested, built and end-to-end
+# tested. Deploying to Cloudflare Workers is opt-in, so forks stay green: set
+# the repository variable CLOUDFLARE_DEPLOY to "true" and add the
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets. See "Deploying" in
+# the README.
 
 on:
   push:
@@ -35,9 +36,33 @@ jobs:
       # Holds the bundled songbooks and the exporter to the songbook schema.
       - run: npm test
 
+      # End-to-end tests drive a build in headless Chromium. It uses the small
+      # soundfont alphaTab ships with: the hosted copy (SOUNDFONT_URL) only
+      # allows the production origin, so playback would fail on localhost.
+      - name: Build for end-to-end tests
+        run: npm run build
+        env:
+          VITE_SOUNDFONT_URL: /soundfont/sonivox.sf3
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
       # The 40 MB soundfont is over Cloudflare's 25 MiB per-file limit, so
       # playback uses SOUNDFONT_URL (a hosted copy) or else the small bank
-      # alphaTab ships with.
+      # alphaTab ships with. This build replaces the test build in dist/.
       - run: npm run build
         env:
           VITE_SOUNDFONT_URL: ${{ vars.SOUNDFONT_URL || '/soundfont/sonivox.sf3' }}

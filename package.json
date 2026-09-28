@@ -13,7 +13,8 @@
     "predev": "npm run songbooks && npm run soundfont",
     "prebuild": "npm run songbooks && npm run soundfont",
     "soundfont": "node scripts/fetch-soundfont.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@coderline/alphatab": "^1.8.4",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@coderline/alphatab-vite": "^1.8.4",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
