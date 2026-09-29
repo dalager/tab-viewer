@@ -1,4 +1,3 @@
-import * as alphaTab from '@coderline/alphatab'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExportDialog } from '@/components/ExportDialog'
 import { ScoreView } from '@/components/ScoreView'
@@ -15,8 +14,7 @@ import { useSongbooks } from '@/hooks/useSongbooks'
 import { isLocalBook } from '@/lib/localSongbooks'
 import { parseLocation, piecePath, pieceUrl } from '@/lib/permalink'
 import type { Songbook } from '@/lib/songbook'
-import { computeSystemTops, pageBy, scrollToEdge, topVisibleBar } from '@/score/paging'
-import { LAYOUT_CYCLE, MAX_SCALE, MIN_SCALE, SPEED_STEP } from '@/score/settings'
+import { SPEED_STEP } from '@/score/settings'
 import { SHORTCUTS, type ShortcutActions } from '@/shortcuts'
 
 const STORAGE_KEY = 'tab-viewer:selected'
@@ -55,10 +53,6 @@ export default function App() {
     open: overlay === which,
     onOpenChange: (open: boolean) => setOverlay(open ? which : null),
   })
-  // Empty set means "render every track".
-  const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set())
-  const [scale, setScale] = useState(1)
-  const [layoutMode, setLayoutMode] = useState<alphaTab.LayoutMode>(alphaTab.LayoutMode.Page)
   const [dragDepth, setDragDepth] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -77,13 +71,11 @@ export default function App() {
   const allTabs = useMemo(() => [...imported, ...(book?.tabs ?? [])], [imported, book])
 
   const {
-    api,
-    score,
+    ready: scoreReady,
     isLoading,
     error,
     renderVersion,
     loadFile,
-    renderTracks,
     isPlayerReady,
     isPlaying,
     cursorVisible,
@@ -98,6 +90,18 @@ export default function App() {
     toggleMetronome,
     seekToBar,
     currentBar,
+    scale,
+    zoomBy,
+    resetZoom,
+    layout,
+    cycleLayout,
+    tracks,
+    selectedTracks,
+    setSelectedTracks,
+    toggleFirstTrackOnly,
+    page,
+    scrollToEdge,
+    topVisibleBar,
   } = useAlphaTab(canvasRef, viewportRef)
   const { isFullscreen, toggle: toggleFullscreen, exit: exitFullscreen } = useFullscreen(shellRef)
 
@@ -136,12 +140,6 @@ export default function App() {
       loaded.tabs.some((t) => t.id === prev) ? prev : (loaded.tabs[0]?.id ?? null),
     )
   }, [])
-
-  // Cached staff-system boundaries, invalidated whenever a render completes.
-  const systemTops = useRef<number[]>([])
-  useEffect(() => {
-    systemTops.current = computeSystemTops(api, viewportRef.current)
-  }, [api, renderVersion])
 
   // Read by effects that must not re-run when it changes: a new selection
   // must wait for its own render before a pending bar can be applied to it.
@@ -211,19 +209,11 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [seekToBar, loadBook])
 
-  // A new piece starts with every track shown again. Adjusting during render
-  // rather than inside the load effect avoids a cascading second render.
-  const [tracksPiece, setTracksPiece] = useState(selectedId)
-  if (tracksPiece !== selectedId) {
-    setTracksPiece(selectedId)
-    setSelectedTracks(new Set())
-  }
-
   useEffect(() => {
-    if (!selected || !api) return
+    if (!selected || !scoreReady) return
     void loadFile(selected.file)
     viewportRef.current?.scrollTo({ top: 0 })
-  }, [selected, api, loadFile])
+  }, [selected, scoreReady, loadFile])
 
   /** Stores a .sbk in this browser, switches to it and closes whatever dialog led there. */
   const openBook = useCallback(
@@ -276,66 +266,6 @@ export default function App() {
     void handleImport(Array.from(e.dataTransfer.files))
   }
 
-  const changeTracks = useCallback(
-    (next: Set<number>) => {
-      setSelectedTracks(next)
-      renderTracks(next)
-    },
-    [renderTracks],
-  )
-
-  // `t` cycles between every track and the first one only.
-  const toggleTracks = useCallback(() => {
-    const all = score?.tracks ?? []
-    if (all.length === 0) return
-    const firstOnly = selectedTracks.size === 1 && selectedTracks.has(all[0].index)
-    changeTracks(firstOnly ? new Set() : new Set([all[0].index]))
-  }, [score, selectedTracks, changeTracks])
-
-  const applyDisplaySetting = useCallback(
-    (mutate: () => void) => {
-      if (!api) return
-      mutate()
-      api.updateSettings()
-      api.render()
-    },
-    [api],
-  )
-
-  const zoomBy = useCallback(
-    (delta: number) => {
-      const next = Math.round(Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale + delta)) * 10) / 10
-      setScale(next)
-      applyDisplaySetting(() => {
-        if (api) api.settings.display.scale = next
-      })
-    },
-    [api, scale, applyDisplaySetting],
-  )
-
-  const resetZoom = useCallback(() => {
-    setScale(1)
-    applyDisplaySetting(() => {
-      if (api) api.settings.display.scale = 1
-    })
-  }, [api, applyDisplaySetting])
-
-  const cycleLayout = useCallback(() => {
-    const next = LAYOUT_CYCLE[(LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length]
-    setLayoutMode(next)
-    applyDisplaySetting(() => {
-      if (api) api.settings.display.layoutMode = next
-    })
-  }, [api, layoutMode, applyDisplaySetting])
-
-  const step = useCallback(
-    (direction: 1 | -1, fraction: number) => {
-      const viewport = viewportRef.current
-      if (viewport) pageBy(viewport, systemTops.current, direction, layoutMode, fraction)
-    },
-    [layoutMode],
-  )
-
   const goToPiece = useCallback(
     (offset: 1 | -1) => {
       if (allTabs.length === 0) return
@@ -357,7 +287,7 @@ export default function App() {
   // in view. Imports are skipped: their file only exists in this browser.
   const copyLink = useCallback(async () => {
     if (!selected || linkBlocked) return
-    const bar = (currentBar() ?? topVisibleBar(api, viewportRef.current, layoutMode)) + 1
+    const bar = (currentBar() ?? topVisibleBar()) + 1
     window.history.replaceState(null, '', piecePath(selected.id, bar, selectedBook))
     try {
       await navigator.clipboard.writeText(pieceUrl(selected.id, bar, selectedBook))
@@ -366,17 +296,17 @@ export default function App() {
       // Clipboard can be refused (permissions, insecure context); the address
       // bar already holds the link, so there is still something to copy.
     }
-  }, [selected, selectedBook, linkBlocked, currentBar, api, layoutMode])
+  }, [selected, selectedBook, linkBlocked, currentBar, topVisibleBar])
 
   const overlayOpen = overlay !== null
 
   const shortcutActions: ShortcutActions = {
-    pageDown: () => step(1, 0.92),
-    pageUp: () => step(-1, 0.92),
-    halfPageDown: () => step(1, 0.46),
-    halfPageUp: () => step(-1, 0.46),
-    scoreStart: () => viewportRef.current && scrollToEdge(viewportRef.current, 'start'),
-    scoreEnd: () => viewportRef.current && scrollToEdge(viewportRef.current, 'end'),
+    pageDown: () => page(1),
+    pageUp: () => page(-1),
+    halfPageDown: () => page(1, 'half'),
+    halfPageUp: () => page(-1, 'half'),
+    scoreStart: () => scrollToEdge('start'),
+    scoreEnd: () => scrollToEdge('end'),
     nextPiece: () => goToPiece(1),
     previousPiece: () => goToPiece(-1),
     openPalette: openOverlay('palette'),
@@ -387,7 +317,7 @@ export default function App() {
     toggleFullscreen,
     toggleSidebar: () => setSidebarOpen((v) => !v),
     cycleLayout,
-    toggleTracks,
+    toggleTracks: toggleFirstTrackOnly,
     zoomIn: () => zoomBy(0.1),
     zoomOut: () => zoomBy(-0.1),
     resetZoom,
@@ -440,11 +370,11 @@ export default function App() {
 
       <Toolbar
         tab={selected}
-        tracks={score?.tracks ?? []}
+        tracks={tracks}
         selectedTracks={selectedTracks}
-        onTracksChange={changeTracks}
+        onTracksChange={setSelectedTracks}
         scale={scale}
-        layoutMode={layoutMode}
+        layout={layout}
         isFullscreen={isFullscreen}
         sidebarOpen={sidebarOpen}
         isPlayerReady={isPlayerReady}

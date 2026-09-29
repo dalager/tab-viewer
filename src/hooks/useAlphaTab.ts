@@ -1,22 +1,21 @@
 import * as alphaTab from '@coderline/alphatab'
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { type ScoreDisplay, useScoreDisplay } from '@/hooks/useScoreDisplay'
 import { errorMessage, fetchBytes } from '@/lib/utils'
 import { buildSettings, MAX_SPEED, MIN_SPEED, NYLON_GUITAR_PROGRAM } from '@/score/settings'
 
-export interface UseAlphaTab {
-  api: alphaTab.AlphaTabApi | null
-  score: alphaTab.model.Score | null
+export interface UseAlphaTab extends ScoreDisplay {
+  /** True once the alphaTab instance exists and `loadFile` can be used. */
+  ready: boolean
   isLoading: boolean
   error: string | null
   /**
    * Bumps once each render's bounds lookup is built (postRenderFinished, not
-   * renderFinished, which fires before it exists); paging and bar links read it.
+   * renderFinished, which fires before it exists); a bar link waits for it.
    */
   renderVersion: number
   /** Load a piece by URL; http for hosted songbooks, blob for .sbk pieces and imports. */
   loadFile: (url: string) => Promise<void>
-  /** Render only these track indexes. Empty set is treated as "all". */
-  renderTracks: (indexes: Set<number>) => void
   /** True once the soundfont is loaded and playback is usable. */
   isPlayerReady: boolean
   isPlaying: boolean
@@ -61,7 +60,9 @@ function applyPrograms(
 }
 
 /**
- * Owns the single AlphaTabApi instance for the session.
+ * Owns the single AlphaTabApi instance for the session, and is the only way
+ * the rest of the app reaches it: callers get operations in the app's own
+ * terms (useScoreDisplay covers zoom, layout, tracks and paging), never the api.
  *
  * The effect cleanup calls api.destroy(), which also covers React StrictMode's
  * double-mount in dev (two instances would otherwise mean two worker pairs).
@@ -257,16 +258,6 @@ export function useAlphaTab(
     [beginLoad],
   )
 
-  const renderTracks = useCallback((indexes: Set<number>) => {
-    const instance = apiRef.current
-    const tracks = instance?.score?.tracks
-    if (!instance || !tracks) return
-
-    const selected = indexes.size === 0 ? tracks : tracks.filter((t) => indexes.has(t.index))
-    if (selected.length === 0) return
-    instance.renderTracks(selected)
-  }, [])
-
   const setSpeed = useCallback((value: number) => {
     // Rounded to whole percent so repeated steps do not drift.
     const next = Math.round(Math.min(MAX_SPEED, Math.max(MIN_SPEED, value)) * 100) / 100
@@ -330,14 +321,15 @@ export function useAlphaTab(
     [],
   )
 
+  const display = useScoreDisplay(api, score, renderVersion, viewportRef)
+
   return {
-    api,
-    score,
+    ...display,
+    ready: api !== null,
     isLoading,
     error,
     renderVersion,
     loadFile,
-    renderTracks,
     isPlayerReady,
     isPlaying,
     cursorVisible,

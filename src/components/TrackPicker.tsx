@@ -1,32 +1,15 @@
-import type * as alphaTab from '@coderline/alphatab'
 import { Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
+import type { ScoreTrack } from '@/score/tracks'
 
 interface TrackPickerProps {
-  tracks: alphaTab.model.Track[]
+  tracks: ScoreTrack[]
   /** Selected track indexes. Empty means every track. */
   selected: Set<number>
   onChange: (next: Set<number>) => void
-}
-
-/** Short summary line: tuning for fretted staves, MIDI program otherwise. */
-function describeTrack(track: alphaTab.model.Track): string {
-  const staff = track.staves[0]
-  const parts: string[] = []
-
-  if (staff?.isStringed && staff.tuning.length > 0) {
-    parts.push(`${staff.tuning.length}-string`)
-    const name = staff.tuningName?.trim()
-    if (name) parts.push(name)
-  } else {
-    parts.push(`program ${track.playbackInfo.program}`)
-  }
-
-  if (track.staves.length > 1) parts.push(`${track.staves.length} staves`)
-  return parts.join(' · ')
 }
 
 export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
@@ -107,10 +90,10 @@ export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
                   <Checkbox checked={checked} onCheckedChange={() => toggle(track.index)} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-neutral-900">
-                      {track.name?.trim() || `Track ${track.index + 1}`}
+                      {track.name}
                     </span>
                     <span className="block truncate text-xs text-neutral-500">
-                      {describeTrack(track)}
+                      {track.summary}
                     </span>
                   </span>
                 </label>

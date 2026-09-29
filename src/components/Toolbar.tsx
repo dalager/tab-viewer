@@ -1,4 +1,3 @@
-import * as alphaTab from '@coderline/alphatab'
 import {
   BookOpen,
   Check,
@@ -27,16 +26,17 @@ import { TrackPicker } from '@/components/TrackPicker'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import { LAYOUT_LABELS } from '@/score/settings'
+import { LAYOUT_LABELS, type Layout } from '@/score/settings'
+import type { ScoreTrack } from '@/score/tracks'
 import type { TabEntry } from '@/types'
 
 interface ToolbarProps {
   tab: TabEntry | null
-  tracks: alphaTab.model.Track[]
+  tracks: ScoreTrack[]
   selectedTracks: Set<number>
   onTracksChange: (next: Set<number>) => void
   scale: number
-  layoutMode: alphaTab.LayoutMode
+  layout: Layout
   isFullscreen: boolean
   sidebarOpen: boolean
   isPlayerReady: boolean
@@ -111,8 +111,8 @@ function ToolButton({
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const { tab, tracks, scale, layoutMode } = props
-  const horizontal = layoutMode === alphaTab.LayoutMode.Horizontal
+  const { tab, tracks, scale, layout } = props
+  const horizontal = layout === 'horizontal'
   const playerOff = !props.isPlayerReady
 
   return (
@@ -184,7 +184,7 @@ export function Toolbar(props: ToolbarProps) {
       />
       <ToolButton
         icon={horizontal ? MoveHorizontal : FileText}
-        label={`Layout: ${LAYOUT_LABELS[layoutMode] ?? 'Page'}`}
+        label={`Layout: ${LAYOUT_LABELS[layout]}`}
         shortcut="l"
         onClick={props.onCycleLayout}
       />

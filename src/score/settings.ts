@@ -18,15 +18,31 @@ export const MAX_SPEED = 2.0
 export const SPEED_STEP = 0.05
 export const SPEED_PRESETS = [0.25, 0.5, 0.75, 1.0]
 
-/** Layout modes cycled by the `l` key. */
-export const LAYOUT_CYCLE: alphaTab.LayoutMode[] = [
-  alphaTab.LayoutMode.Page,
-  alphaTab.LayoutMode.Horizontal,
-]
+/** Score layouts, in the app's own terms; only the score hooks map them to alphaTab's. */
+export type Layout = 'page' | 'horizontal'
 
-export const LAYOUT_LABELS: Record<number, string> = {
-  [alphaTab.LayoutMode.Page]: 'Page',
-  [alphaTab.LayoutMode.Horizontal]: 'Horizontal',
+/** Layouts cycled by the `l` key. */
+export const LAYOUT_CYCLE: Layout[] = ['page', 'horizontal']
+
+export const LAYOUT_LABELS: Record<Layout, string> = {
+  page: 'Page',
+  horizontal: 'Horizontal',
+}
+
+export const LAYOUT_MODES: Record<Layout, alphaTab.LayoutMode> = {
+  page: alphaTab.LayoutMode.Page,
+  horizontal: alphaTab.LayoutMode.Horizontal,
+}
+
+/**
+ * How Guitar Pro files are read, for rendering and for import metadata alike.
+ *
+ * GP3-5 files store Windows-1252, but alphaTab 1.8.4 defaults to utf-8.
+ * (The dedicated importer.gp3To5encoding setting is 1.9.0+ only.)
+ * Safe here because the collection is 100% gp3/gp4/gp5.
+ */
+export const IMPORTER_SETTINGS: alphaTab.json.ImporterSettingsJson = {
+  encoding: 'windows-1252',
 }
 
 /**
@@ -41,12 +57,7 @@ export function buildSettings(viewport: HTMLElement | null): alphaTab.json.Setti
       fontDirectory: '/font/',
       useWorkers: true,
     },
-    importer: {
-      // GP3-5 files store Windows-1252, but alphaTab 1.8.4 defaults to utf-8.
-      // (The dedicated importer.gp3To5encoding setting is 1.9.0+ only.)
-      // Safe here because the collection is 100% gp3/gp4/gp5.
-      encoding: 'windows-1252',
-    },
+    importer: IMPORTER_SETTINGS,
     display: {
       layoutMode: alphaTab.LayoutMode.Page,
       scale: 1.0,

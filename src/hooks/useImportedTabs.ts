@@ -1,4 +1,3 @@
-import * as alphaTab from '@coderline/alphatab'
 import { useCallback, useEffect, useState } from 'react'
 import {
   deleteImported,
@@ -7,6 +6,7 @@ import {
   putImported,
 } from '@/lib/importedTabs'
 import { errorMessage } from '@/lib/utils'
+import { readScoreMetadata } from '@/score/metadata'
 import type { TabEntry } from '@/types'
 
 /** Formats alphaTab can open. gp3-5 are binary, gpx/gp are zipped XML. */
@@ -47,19 +47,6 @@ function newId(): string {
   return `${ID_PREFIX}${uuid}`
 }
 
-/**
- * Parse the file once, on the main thread, to pick up the title and artist
- * it carries. Throws if alphaTab cannot read it, which is the import's
- * validation step: a file that fails here would fail in the viewer too.
- */
-function readMetadata(bytes: ArrayBuffer): { title: string; artist: string } {
-  const settings = new alphaTab.Settings()
-  // Same reason as in score/settings.ts: GP3-5 store Windows-1252.
-  settings.importer.encoding = 'windows-1252'
-  const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(bytes), settings)
-  return { title: score.title.trim(), artist: score.artist.trim() }
-}
-
 function stem(name: string): string {
   return name.replace(/\.[^.]+$/, '')
 }
@@ -72,7 +59,7 @@ async function toRecord(file: File): Promise<ImportedRecord> {
   const bytes = await file.arrayBuffer()
   let meta: { title: string; artist: string }
   try {
-    meta = readMetadata(bytes)
+    meta = readScoreMetadata(bytes)
   } catch (e) {
     const reason = errorMessage(e)
     throw new Error(`${file.name}: could not be read (${reason})`)
