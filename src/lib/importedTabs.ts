@@ -2,6 +2,9 @@
 
 import { IMPORTED_STORE, withStore } from '@/lib/db'
 
+/** Every imported piece's id starts with this, so stored ids can be told apart. */
+export const IMPORTED_ID_PREFIX = 'imported-'
+
 export interface ImportedRecord {
   id: string
   title: string

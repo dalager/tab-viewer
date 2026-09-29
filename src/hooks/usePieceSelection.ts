@@ -1,6 +1,14 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isLocalBook } from '@/lib/localSongbooks'
 import { parseLocation, piecePath } from '@/lib/permalink'
+import {
+  isImported,
+  type PieceRef,
+  type PieceTarget,
+  parsePieceKey,
+  pieceKey,
+  sameTarget,
+} from '@/lib/pieces'
 import type { Songbook } from '@/lib/songbook'
 import type { TabEntry } from '@/types'
 
@@ -8,61 +16,71 @@ const STORAGE_KEY = 'tab-viewer:selected'
 
 /** A bar (1-based) to jump to once the given piece has rendered. */
 interface PendingBar {
-  id: string
+  target: PieceTarget
   bar: number
 }
 
-/** A piece and the songbook it lives in, which is what a link names. */
-export interface PieceLink {
-  id: string
-  book: string | null
+/** The piece the address names, if any; `book` is null for a link without `?book=`. */
+function targetFromLocation(loc: Location = window.location): PieceTarget | null {
+  const { id, book } = parseLocation(loc)
+  return id ? { id, book } : null
 }
 
 function pendingBarFrom(loc: Location): PendingBar | null {
-  const { id, bar } = parseLocation(loc)
-  return id && bar ? { id, bar } : null
+  const target = targetFromLocation(loc)
+  const { bar } = parseLocation(loc)
+  return target && bar ? { target, bar } : null
 }
 
 /** Whether a link's bar can be applied now: its piece is open and has rendered. */
 function isDue(
   pending: PendingBar | null,
   renderVersion: number,
-  openId: string | null,
+  open: PieceTarget | null,
 ): pending is PendingBar {
-  return pending !== null && renderVersion > 0 && pending.id === openId
+  return pending !== null && renderVersion > 0 && sameTarget(pending.target, open)
 }
 
-/** Every piece that is not an import belongs to the one loaded songbook. */
-function bookOfPiece(piece: TabEntry | null, book: Songbook | null): string | null {
-  if (!piece || piece.imported) return null
-  return book?.url ?? null
+/** The songbook a piece's link names; imports have none. */
+function linkedBook(piece: TabEntry | null): string | null {
+  return piece && !isImported(piece) ? piece.book : null
 }
 
 /** Why the piece cannot be shared by link, or null when it can. */
-function linkBlockedReason(piece: TabEntry | null, book: string | null): string | null {
+function linkBlockedReason(piece: TabEntry | null): string | null {
   if (!piece) return 'No piece is open'
-  if (piece.imported) return 'Imported pieces live only in this browser, so they cannot be linked'
-  if (book && isLocalBook(book)) {
+  if (isImported(piece)) return 'Imported pieces live only in this browser, so they cannot be linked'
+  if (isLocalBook(piece.book)) {
     return 'This songbook was opened from a file, so its pieces cannot be linked'
   }
   return null
 }
 
-/** The songbook's first piece, else the first import: what to show instead of nothing. */
-function fallbackPiece(tabs: TabEntry[]): string | null {
-  return (tabs.find((t) => !t.imported) ?? tabs[0])?.id ?? null
+/** Just the book and id, without the rest of the entry. */
+function refOf(piece: PieceRef): PieceRef {
+  return { book: piece.book, id: piece.id }
 }
 
-/** The piece a freshly loaded book opens: the open one if it has it, else its first. */
-function pieceAfterLoad(loaded: Songbook, open: string | null): string | null {
-  return loaded.tabs.some((t) => t.id === open) ? open : (loaded.tabs[0]?.id ?? null)
+/** The first songbook piece, else the first import: what to show instead of nothing. */
+function fallbackPiece(tabs: TabEntry[]): TabEntry | undefined {
+  return tabs.find((t) => !isImported(t)) ?? tabs[0]
 }
 
-/** The piece `offset` steps from `index`, wrapping around; null without pieces. */
-function neighbour(tabs: TabEntry[], index: number, offset: 1 | -1): string | null {
-  if (tabs.length === 0) return null
+/**
+ * The piece a freshly loaded book opens: the open piece's id in the new book
+ * if it has one (a copy of the same book, say), else its first piece.
+ */
+function pieceAfterLoad(loaded: Songbook, open: PieceTarget | null): PieceTarget | null {
+  if (open && loaded.tabs.some((t) => t.id === open.id)) return { id: open.id, book: loaded.url }
+  const first = loaded.tabs[0]
+  return first ? refOf(first) : null
+}
+
+/** The piece `offset` steps from `index`, wrapping around; undefined without pieces. */
+function neighbour(tabs: TabEntry[], index: number, offset: 1 | -1): TabEntry | undefined {
+  if (tabs.length === 0) return undefined
   const base = Math.max(index, 0)
-  return tabs[(base + offset + tabs.length) % tabs.length].id
+  return tabs[(base + offset + tabs.length) % tabs.length]
 }
 
 /**
@@ -79,7 +97,8 @@ function syncAddressBar(piece: TabEntry | null, book: string | null, tabs: TabEn
   const current = parseLocation()
   if (current.id === piece.id && current.book === book) return
   const target = piecePath(piece.id, null, book)
-  const known = tabs.some((t) => t.id === current.id)
+  const shown = targetFromLocation()
+  const known = tabs.some((t) => sameTarget(t, shown))
   if (known) window.history.pushState(null, '', target)
   else window.history.replaceState(null, '', target)
 }
@@ -89,7 +108,7 @@ function syncAddressBar(piece: TabEntry | null, book: string | null, tabs: TabEn
  * piece, so later re-renders (zoom, tracks, layout) leave the reader where they are.
  */
 function usePendingBar(
-  selectedId: string | null,
+  target: PieceTarget | null,
   renderVersion: number,
   seekToBar: (index: number) => void,
 ) {
@@ -97,26 +116,26 @@ function usePendingBar(
 
   // Read by effects that must not re-run when it changes: a new selection
   // must wait for its own render before a pending bar can be applied to it.
-  const selectedIdRef = useRef(selectedId)
+  const targetRef = useRef(target)
   useEffect(() => {
-    selectedIdRef.current = selectedId
-  }, [selectedId])
+    targetRef.current = target
+  }, [target])
 
   useEffect(() => {
     const pending = pendingBar.current
-    if (!isDue(pending, renderVersion, selectedIdRef.current)) return
+    if (!isDue(pending, renderVersion, targetRef.current)) return
     pendingBar.current = null
     seekToBar(pending.bar - 1)
   }, [renderVersion, seekToBar])
 
-  return { pendingBar, selectedIdRef }
+  return { pendingBar, targetRef }
 }
 
 interface PopContext {
   pendingBar: RefObject<PendingBar | null>
-  selectedIdRef: RefObject<string | null>
+  targetRef: RefObject<PieceTarget | null>
   bookUrlRef: RefObject<string | null>
-  select: (id: string) => void
+  select: (target: PieceTarget) => void
   loadBook: (url: string) => Promise<unknown>
   seekToBar: (index: number) => void
 }
@@ -128,17 +147,18 @@ function isOtherBook(book: string | null, open: string | null): book is string {
 
 /** Back/Forward landed: select the piece in the address, loading its songbook first if needed. */
 function followPop(ctx: PopContext): void {
-  const { id, book } = parseLocation()
-  if (!id) return
+  const target = targetFromLocation()
+  if (!target) return
+  const { book } = target
   const pending = pendingBarFrom(window.location)
-  if (!isOtherBook(book, ctx.bookUrlRef.current) && id === ctx.selectedIdRef.current) {
+  if (!isOtherBook(book, ctx.bookUrlRef.current) && sameTarget(target, ctx.targetRef.current)) {
     // Same piece, already rendered: nothing will re-render, so jump now.
     ctx.pendingBar.current = null
     if (pending) ctx.seekToBar(pending.bar - 1)
     return
   }
   ctx.pendingBar.current = pending
-  ctx.select(id)
+  ctx.select(target)
   if (isOtherBook(book, ctx.bookUrlRef.current)) void ctx.loadBook(book)
 }
 
@@ -150,24 +170,30 @@ function usePopState({ bookUrl, ...rest }: PopStateOptions) {
     bookUrlRef.current = bookUrl
   }, [bookUrl])
 
-  const { pendingBar, selectedIdRef, select, loadBook, seekToBar } = rest
+  const { pendingBar, targetRef, select, loadBook, seekToBar } = rest
   useEffect(() => {
-    const ctx = { pendingBar, selectedIdRef, bookUrlRef, select, loadBook, seekToBar }
+    const ctx = { pendingBar, targetRef, bookUrlRef, select, loadBook, seekToBar }
     const onPopState = () => followPop(ctx)
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [pendingBar, selectedIdRef, select, loadBook, seekToBar])
+  }, [pendingBar, targetRef, select, loadBook, seekToBar])
 }
 
-/** The open piece's id, starting from the address or else the one open last time. */
-function useStoredSelection() {
-  const [selectedId, setSelectedId] = useState<string | null>(
-    () => parseLocation().id ?? localStorage.getItem(STORAGE_KEY),
+/** The piece open last time, as stored; older versions stored a bare id. */
+function storedTarget(): PieceTarget | null {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  return stored ? parsePieceKey(stored) : null
+}
+
+/** The piece to open: the one the address names, or else the one open last time. */
+function useTarget() {
+  const [target, setTarget] = useState<PieceTarget | null>(
+    () => targetFromLocation() ?? storedTarget(),
   )
-  useEffect(() => {
-    if (selectedId) localStorage.setItem(STORAGE_KEY, selectedId)
-  }, [selectedId])
-  return [selectedId, setSelectedId] as const
+  const select = useCallback((piece: PieceTarget) => {
+    setTarget({ id: piece.id, book: piece.book })
+  }, [])
+  return { target, setTarget, select }
 }
 
 /**
@@ -178,23 +204,25 @@ function useStoredSelection() {
 function fallbackFor(
   settled: boolean,
   selected: TabEntry | null,
-  selectedId: string | null,
+  target: PieceTarget | null,
   tabs: TabEntry[],
-): string | null | undefined {
+): PieceTarget | null | undefined {
   if (!settled || selected) return undefined
   const fallback = fallbackPiece(tabs)
-  return fallback === selectedId ? undefined : fallback
+  if (fallback) return refOf(fallback)
+  return target === null ? undefined : null
 }
 
 /** What a link to the piece names, or null when it cannot be linked. */
-function linkOf(piece: TabEntry | null, book: string | null, blocked: string | null) {
-  return piece && !blocked ? { id: piece.id, book } : null
+function linkOf(piece: TabEntry | null, blocked: string | null): PieceRef | null {
+  return piece && !blocked ? refOf(piece) : null
 }
 
 interface PieceSelectionOptions {
-  /** Every piece on offer: imports first, then the loaded songbook's. */
+  /** Every piece on offer, from every book. */
   tabs: TabEntry[]
-  book: Songbook | null
+  /** URL of the loaded songbook, which Back/Forward compares links against. */
+  bookUrl: string | null
   /** True once imports and the songbook have finished loading. */
   settled: boolean
   loadBook: (url: string) => Promise<unknown>
@@ -207,61 +235,51 @@ interface PieceSelectionOptions {
  * history and localStorage, including bar links and Back/Forward.
  */
 export function usePieceSelection(options: PieceSelectionOptions) {
-  const { tabs, book, settled, loadBook, renderVersion, seekToBar } = options
-  const [selectedId, setSelectedId] = useStoredSelection()
-  const selectedIndex = useMemo(
-    () => tabs.findIndex((t) => t.id === selectedId),
-    [tabs, selectedId],
-  )
+  const { tabs, bookUrl, settled, loadBook, renderVersion, seekToBar } = options
+  const { target, setTarget, select } = useTarget()
+  const selectedIndex = useMemo(() => tabs.findIndex((t) => sameTarget(t, target)), [tabs, target])
   const selected = tabs[selectedIndex] ?? null
-  const selectedBook = bookOfPiece(selected, book)
+  const selectedBook = linkedBook(selected)
 
   // Fall back rather than show nothing once imports and the songbook have
   // settled. Adjusted during render so it settles in the same pass.
-  const fallback = fallbackFor(settled, selected, selectedId, tabs)
-  if (fallback !== undefined) setSelectedId(fallback)
+  const fallback = fallbackFor(settled, selected, target, tabs)
+  if (fallback !== undefined) setTarget(fallback)
 
-  const { pendingBar, selectedIdRef } = usePendingBar(selectedId, renderVersion, seekToBar)
+  const { pendingBar, targetRef } = usePendingBar(target, renderVersion, seekToBar)
+
+  // Stored with its book, so it reopens in the right one.
+  useEffect(() => {
+    if (selected) localStorage.setItem(STORAGE_KEY, pieceKey(selected))
+  }, [selected])
 
   useEffect(() => {
     if (settled) syncAddressBar(selected, selectedBook, tabs)
   }, [settled, selected, selectedBook, tabs])
 
-  usePopState({
-    bookUrl: book?.url ?? null,
-    pendingBar,
-    selectedIdRef,
-    select: setSelectedId,
-    loadBook,
-    seekToBar,
-  })
+  usePopState({ bookUrl, pendingBar, targetRef, select, loadBook, seekToBar })
 
-  // A freshly loaded songbook stays on the open piece if it has one by that id
-  // (a copy of the same book, say), else opens on its first piece. Jumping
-  // regardless would load a second piece while the first is still rendering.
+  // Jumping regardless of the open piece would load a second piece while the
+  // first is still rendering.
   const onBookLoaded = useCallback((loaded: Songbook) => {
-    setSelectedId((open) => pieceAfterLoad(loaded, open))
-  }, [setSelectedId])
+    setTarget((open) => pieceAfterLoad(loaded, open))
+  }, [setTarget])
 
   const goToPiece = useCallback(
     (offset: 1 | -1) => {
       const next = neighbour(tabs, selectedIndex, offset)
-      if (next) setSelectedId(next)
+      if (next) select(next)
     },
-    [tabs, selectedIndex, setSelectedId],
+    [tabs, selectedIndex, select],
   )
 
-  const linkBlocked = linkBlockedReason(selected, selectedBook)
-  const link = useMemo<PieceLink | null>(
-    () => linkOf(selected, selectedBook, linkBlocked),
-    [selected, linkBlocked, selectedBook],
-  )
+  const linkBlocked = linkBlockedReason(selected)
+  const link = useMemo(() => linkOf(selected, linkBlocked), [selected, linkBlocked])
 
   return {
-    selectedId,
-    select: setSelectedId,
+    select,
     selected,
-    selectedBook,
+    selectedKey: selected ? pieceKey(selected) : null,
     link,
     linkBlocked,
     onBookLoaded,

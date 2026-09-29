@@ -3,6 +3,7 @@
 import { expect, test } from '@playwright/test'
 import {
   BOOK_NAME,
+  BOOK_URL,
   expectOpenPiece,
   expectScoreRendered,
   openApp,
@@ -10,6 +11,7 @@ import {
   sidebar,
   sidebarRow,
   title,
+  toolbar,
 } from './helpers'
 
 const [ARPEGGIOS, CELLO, PARTITA] = PIECES
@@ -59,7 +61,7 @@ test('the last open piece is reopened on the next visit', async ({ page }) => {
   await expectOpenPiece(page, PARTITA)
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('tab-viewer:selected')))
-    .toBe(PARTITA.id)
+    .toBe(`${new URL(BOOK_URL, page.url()).href}#${PARTITA.id}`)
 
   await page.goto('/')
   await expectOpenPiece(page, PARTITA)
@@ -109,4 +111,42 @@ test('b hides and shows the sidebar', async ({ page }) => {
   await expect(title(page)).toHaveText(ARPEGGIOS.title)
   await page.getByRole('button', { name: 'Show list' }).click()
   await expect(sidebar(page)).toBeVisible()
+})
+
+test('a star belongs to its book, not to every piece with the same id', async ({ page }) => {
+  await openApp(page)
+  await sidebar(page).getByRole('button', { name: 'Add to favorites' }).nth(1).click()
+  await expect(sidebar(page).getByRole('heading', { name: 'Starred' })).toBeVisible()
+
+  // A copy of the book: the export preselects the starred piece, and its ids
+  // come from the titles, so the copy's piece has the same id as the original.
+  await page.keyboard.press('e')
+  const dialog = page.getByRole('dialog', { name: 'Export songbook' })
+  await expect(dialog.getByText('1 of 3 selected')).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Songbook name' }).fill('Bach copy')
+  await dialog.getByRole('button', { name: 'Save & open' }).click()
+  await expect(toolbar(page).getByRole('button', { name: 'Bach copy', exact: true })).toBeVisible()
+  await expect(title(page)).toHaveText(CELLO.title)
+  await expect(sidebarRow(page, CELLO.title)).toHaveCount(1)
+  await expect(sidebar(page).getByRole('heading', { name: 'Starred' })).toHaveCount(0)
+
+  await page.keyboard.press('o')
+  const books = page.getByRole('dialog', { name: 'Songbooks' })
+  await books.getByRole('button', { name: new RegExp(`^${BOOK_NAME}`) }).click()
+  await expect(sidebar(page).getByRole('heading', { name: 'Starred' })).toBeVisible()
+  await expect(sidebarRow(page, CELLO.title)).toHaveCount(2)
+})
+
+test('favorites stored by an older version are attached to the loaded book', async ({ page }) => {
+  await openApp(page)
+  await page.evaluate((id) => {
+    localStorage.setItem('tab-viewer:favorites', JSON.stringify([id]))
+  }, CELLO.id)
+
+  await page.reload()
+  await expect(sidebar(page).getByRole('heading', { name: 'Starred' })).toBeVisible()
+  await expect(sidebarRow(page, CELLO.title)).toHaveCount(2)
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('tab-viewer:favorites')))
+    .toBe(JSON.stringify([`${new URL(BOOK_URL, page.url()).href}#${CELLO.id}`]))
 })

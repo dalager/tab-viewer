@@ -1,5 +1,7 @@
-export interface TabEntry {
-  /** ASCII slug, unique within its songbook. Also the URL stem. */
+import type { PieceRef } from '@/lib/pieces'
+
+export interface TabEntry extends PieceRef {
+  /** ASCII slug, unique within its songbook (`book`). Also the URL stem. */
   id: string
   title: string
   artist: string
@@ -7,6 +9,4 @@ export interface TabEntry {
   ext: string
   /** URL of the file: http(s) for hosted songbooks, blob: for .sbk pieces and imports. */
   file: string
-  /** Set on pieces the user imported; their bytes live in IndexedDB, not under public/. */
-  imported?: true
 }

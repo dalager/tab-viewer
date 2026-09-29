@@ -4,7 +4,9 @@ import {
   type ImportedRecord,
   listImported,
   putImported,
+  IMPORTED_ID_PREFIX,
 } from '@/lib/importedTabs'
+import { IMPORTED_BOOK } from '@/lib/pieces'
 import { errorMessage } from '@/lib/utils'
 import { readScoreMetadata } from '@/score/metadata'
 import type { TabEntry } from '@/types'
@@ -13,7 +15,6 @@ import type { TabEntry } from '@/types'
 export const IMPORT_EXTENSIONS = ['gp3', 'gp4', 'gp5', 'gpx', 'gp']
 export const IMPORT_ACCEPT = IMPORT_EXTENSIONS.map((e) => `.${e}`).join(',')
 
-const ID_PREFIX = 'imported-'
 
 export interface UseImportedTabs {
   /** Imported pieces, oldest first. Empty until `ready`. */
@@ -29,13 +30,13 @@ export interface UseImportedTabs {
 
 function toEntry(record: ImportedRecord): TabEntry {
   return {
+    book: IMPORTED_BOOK,
     id: record.id,
     title: record.title,
     artist: record.artist,
     ext: record.ext,
     // A blob URL, like a .sbk piece's, so every piece is loaded by fetching `file`.
     file: URL.createObjectURL(new Blob([record.bytes])),
-    imported: true,
   }
 }
 
@@ -44,7 +45,7 @@ function newId(): string {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  return `${ID_PREFIX}${uuid}`
+  return `${IMPORTED_ID_PREFIX}${uuid}`
 }
 
 function stem(name: string): string {

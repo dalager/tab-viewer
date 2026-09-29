@@ -7,13 +7,14 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { isImported, type PieceRef, pieceKey } from '@/lib/pieces'
 import type { TabEntry } from '@/types'
 
 interface TabCommandPaletteProps {
   tabs: TabEntry[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelect: (id: string) => void
+  onSelect: (piece: PieceRef) => void
 }
 
 export function TabCommandPalette({
@@ -22,15 +23,15 @@ export function TabCommandPalette({
   onOpenChange,
   onSelect,
 }: TabCommandPaletteProps) {
-  const imported = tabs.filter((t) => t.imported)
-  const bundled = tabs.filter((t) => !t.imported)
+  const imported = tabs.filter(isImported)
+  const bundled = tabs.filter((t) => !isImported(t))
 
   const renderItem = (tab: TabEntry) => (
     <CommandItem
-      key={tab.id}
+      key={pieceKey(tab)}
       value={tab.title}
       onSelect={() => {
-        onSelect(tab.id)
+        onSelect(tab)
         onOpenChange(false)
       }}
     >

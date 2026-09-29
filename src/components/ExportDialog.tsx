@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useFavorites } from '@/hooks/useFavorites'
+import type { Favorites } from '@/hooks/useFavorites'
 import { downloadFile, exportSongbook } from '@/lib/exportSongbook'
+import { isImported, pieceKey } from '@/lib/pieces'
 import { errorMessage, filterTabs } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
@@ -19,42 +20,42 @@ interface ExportFormProps {
   /** Pieces to choose from: the loaded songbook's and the imported ones. */
   tabs: TabEntry[]
   bookName: string | null
+  favorites: Favorites
   /** Stores the new .sbk in this browser and switches to it. */
   onSaveAndOpen: (file: File) => Promise<unknown>
   onDone: () => void
 }
 
-/** A copy of the selection with every id in `ids` switched on or off. */
-function withIds(selected: Set<string>, ids: string[], on: boolean): Set<string> {
+/** A copy of the selection with every pieceKey in `keys` switched on or off. */
+function withKeys(selected: Set<string>, keys: string[], on: boolean): Set<string> {
   const next = new Set(selected)
-  for (const id of ids) {
-    if (on) next.add(id)
-    else next.delete(id)
+  for (const key of keys) {
+    if (on) next.add(key)
+    else next.delete(key)
   }
   return next
 }
+
+const keysOf = (tabs: TabEntry[]) => tabs.map(pieceKey)
 
 /**
  * Mounted only while the dialog is open, so each opening starts fresh: the
  * starred pieces preselected and favorites read as they are now.
  */
-function ExportForm({ tabs, bookName, onSaveAndOpen, onDone }: ExportFormProps) {
-  const { favorites } = useFavorites()
-  const starredIds = useMemo(
-    () => tabs.filter((t) => favorites.has(t.id)).map((t) => t.id),
-    [tabs, favorites],
-  )
+function ExportForm({ tabs, bookName, favorites, onSaveAndOpen, onDone }: ExportFormProps) {
+  const { isFavorite } = favorites
+  const starredKeys = useMemo(() => keysOf(tabs.filter(isFavorite)), [tabs, isFavorite])
   const [name, setName] = useState(() => (bookName ? `${bookName} (selection)` : 'My songbook'))
   const [description, setDescription] = useState('')
   const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState(() => new Set(starredIds))
+  const [selected, setSelected] = useState(() => new Set(starredKeys))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const shown = useMemo(() => filterTabs(tabs, query), [tabs, query])
 
   const setMany = useCallback(
-    (ids: string[], on: boolean) => setSelected((prev) => withIds(prev, ids, on)),
+    (keys: string[], on: boolean) => setSelected((prev) => withKeys(prev, keys, on)),
     [],
   )
 
@@ -66,7 +67,7 @@ function ExportForm({ tabs, bookName, onSaveAndOpen, onDone }: ExportFormProps) 
       const file = await exportSongbook({
         name,
         description,
-        tabs: tabs.filter((t) => selected.has(t.id)),
+        tabs: tabs.filter((t) => selected.has(pieceKey(t))),
         compress,
       })
       await then(file)
@@ -118,8 +119,8 @@ function ExportForm({ tabs, bookName, onSaveAndOpen, onDone }: ExportFormProps) 
             type="button"
             variant="ghost"
             size="sm"
-            disabled={starredIds.length === 0}
-            onClick={() => setSelected(new Set(starredIds))}
+            disabled={starredKeys.length === 0}
+            onClick={() => setSelected(new Set(starredKeys))}
           >
             Starred
           </Button>
@@ -128,7 +129,7 @@ function ExportForm({ tabs, bookName, onSaveAndOpen, onDone }: ExportFormProps) 
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setMany(shown.map((t) => t.id), true)}
+            onClick={() => setMany(keysOf(shown), true)}
           >
             All
           </Button>
@@ -136,7 +137,7 @@ function ExportForm({ tabs, bookName, onSaveAndOpen, onDone }: ExportFormProps) 
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setMany(shown.map((t) => t.id), false)}
+            onClick={() => setMany(keysOf(shown), false)}
           >
             None
           </Button>
@@ -183,14 +184,14 @@ const PieceChecklist = memo(function PieceChecklist({
   return (
     <ul className="h-72 overflow-y-auto rounded-md border border-neutral-200 p-1">
       {tabs.map((tab) => (
-        <li key={tab.id}>
+        <li key={pieceKey(tab)}>
           <label className="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 hover:bg-neutral-100">
             <Checkbox
-              checked={selected.has(tab.id)}
-              onCheckedChange={(on) => onChange([tab.id], on === true)}
+              checked={selected.has(pieceKey(tab))}
+              onCheckedChange={(on) => onChange([pieceKey(tab)], on === true)}
             />
             <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{tab.title}</span>
-            {tab.imported && <span className="text-xs text-neutral-400">Imported</span>}
+            {isImported(tab) && <span className="text-xs text-neutral-400">Imported</span>}
           </label>
         </li>
       ))}

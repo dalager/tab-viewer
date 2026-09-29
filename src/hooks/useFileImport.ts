@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { IMPORTED_BOOK, type PieceTarget } from '@/lib/pieces'
 import type { Songbook } from '@/lib/songbook'
 
 const isSongbookFile = (file: File) => file.name.toLowerCase().endsWith('.sbk')
@@ -10,8 +11,8 @@ interface FileImportOptions {
   openBookFile: (file: File) => Promise<Songbook | null>
   /** Called with a book opened from a file, once it has loaded. */
   onBookOpened: (book: Songbook) => void
-  /** Selects an imported piece. */
-  select: (id: string) => void
+  /** Opens a piece, here an imported one. */
+  select: (piece: PieceTarget) => void
 }
 
 /**
@@ -40,7 +41,7 @@ export function useFileImport({ importFiles, openBookFile, onBookOpened, select 
       const ids = pieces.length > 0 ? await importFiles(pieces) : []
       const opened = bookFile !== undefined && (await openBook(bookFile))
       const last = ids.at(-1)
-      if (!opened && last) select(last)
+      if (!opened && last) select({ book: IMPORTED_BOOK, id: last })
     },
     [importFiles, openBook, select],
   )

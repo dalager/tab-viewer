@@ -2,36 +2,45 @@ import { Star, X } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useFavorites } from '@/hooks/useFavorites'
+import type { Favorites } from '@/hooks/useFavorites'
+import { isImported, type PieceRef, pieceKey } from '@/lib/pieces'
 import { cn, filterTabs } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
 interface TabSidebarProps {
+  /** Pieces grouped by book, in the order the sections are shown. */
   tabs: TabEntry[]
-  /** Heading for the songbook's pieces; falls back to "Songbook". */
-  bookName: string | null
-  selectedId: string | null
-  onSelect: (id: string) => void
+  /** Section headings by book URL; a book missing here is headed "Songbook". */
+  bookNames: Record<string, string>
+  /** pieceKey of the open piece. */
+  selectedKey: string | null
+  onSelect: (piece: PieceRef) => void
+  favorites: Favorites
   /** Called for pieces with `imported` set; they get a remove button. */
   onRemove: (id: string) => void
   /** Opens the dialog that packs chosen pieces into a new songbook. */
   onExport: () => void
 }
 
+/** Heading for a book's section. */
+function bookHeading(book: string, bookNames: Record<string, string>): string {
+  return isImported({ book }) ? 'Imported' : (bookNames[book] ?? 'Songbook')
+}
+
 /**
- * Section label to show above row `i`, if it starts a new section. Labels are
- * only needed when there is more than one section.
+ * Section label to show above row `i`, if it starts a new section: the first
+ * row, and every row whose book differs from the one above. Labels are only
+ * needed when there is more than one section.
  */
 function sectionHeading(
   shown: TabEntry[],
   i: number,
   labelled: boolean,
-  bookLabel: string,
+  bookNames: Record<string, string>,
 ): string | null {
-  if (!labelled) return null
-  const tab = shown[i]
-  if (i === 0) return tab.imported ? 'Imported' : bookLabel
-  return shown[i - 1].imported && !tab.imported ? bookLabel : null
+  const book = shown[i].book
+  const startsSection = i === 0 || shown[i - 1].book !== book
+  return labelled && startsSection ? bookHeading(book, bookNames) : null
 }
 
 function SectionHeading({ children }: { children: string }) {
@@ -47,17 +56,18 @@ const PAGE_SIZE = 60
 
 export function TabSidebar({
   tabs,
-  bookName,
-  selectedId,
+  bookNames,
+  selectedKey,
   onSelect,
+  favorites,
   onRemove,
   onExport,
 }: TabSidebarProps) {
   const [query, setQuery] = useState('')
-  const hasImports = useMemo(() => tabs.some((t) => t.imported), [tabs])
+  const manyBooks = useMemo(() => new Set(tabs.map((t) => t.book)).size > 1, [tabs])
   const [visible, setVisible] = useState(PAGE_SIZE)
   const sentinelRef = useRef<HTMLLIElement>(null)
-  const { favorites, isFavorite, toggleFavorite } = useFavorites()
+  const { isFavorite, toggleFavorite } = favorites
 
   const filtered = useMemo(() => filterTabs(tabs, query), [tabs, query])
 
@@ -72,7 +82,7 @@ export function TabSidebar({
   // Jumping to a piece past the current page (n/p, or the palette) must not
   // hide it from the list, so extend far enough to include it. Derived rather
   // than stored: there is nothing to keep in sync.
-  const selectedIndex = selectedId ? filtered.findIndex((t) => t.id === selectedId) : -1
+  const selectedIndex = filtered.findIndex((t) => pieceKey(t) === selectedKey)
   const needed = selectedIndex >= 0 ? Math.ceil((selectedIndex + 1) / PAGE_SIZE) * PAGE_SIZE : 0
   const effectiveVisible = Math.max(visible, needed)
 
@@ -83,10 +93,10 @@ export function TabSidebar({
   // a row does not make it jump out from under the pointer. Few enough that
   // they need no paging.
   const starred = useMemo(
-    () => filtered.filter((t) => favorites.has(t.id)),
-    [filtered, favorites],
+    () => filtered.filter(isFavorite),
+    [filtered, isFavorite],
   )
-  const labelled = hasImports || starred.length > 0
+  const labelled = manyBooks || starred.length > 0
 
   // Grow the list when the sentinel scrolls into the ScrollArea's viewport.
   useEffect(() => {
@@ -109,15 +119,16 @@ export function TabSidebar({
   }, [hasMore, effectiveVisible, filtered.length])
 
   function renderRow(tab: TabEntry, keyPrefix = '') {
-    const favorite = isFavorite(tab.id)
+    const key = pieceKey(tab)
+    const favorite = isFavorite(tab)
     return (
-      <li key={keyPrefix + tab.id} className="flex items-center gap-1">
+      <li key={keyPrefix + key} className="flex items-center gap-1">
         <button
           type="button"
-          onClick={() => onSelect(tab.id)}
+          onClick={() => onSelect(tab)}
           className={cn(
             'w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-left text-sm transition-colors',
-            tab.id === selectedId
+            key === selectedKey
               ? 'bg-neutral-900 text-white'
               : 'text-neutral-700 hover:bg-neutral-200',
           )}
@@ -127,7 +138,7 @@ export function TabSidebar({
         </button>
         <button
           type="button"
-          onClick={() => toggleFavorite(tab.id)}
+          onClick={() => toggleFavorite(tab)}
           className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-amber-500"
           aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
           aria-pressed={favorite}
@@ -135,7 +146,7 @@ export function TabSidebar({
         >
           <Star className={cn('size-4', favorite && 'fill-amber-400 text-amber-500')} />
         </button>
-        {tab.imported && (
+        {isImported(tab) && (
           <button
             type="button"
             onClick={() => onRemove(tab.id)}
@@ -186,9 +197,9 @@ export function TabSidebar({
           {starred.map((tab) => renderRow(tab, 'starred:'))}
 
           {shown.map((tab, i) => {
-            const heading = sectionHeading(shown, i, labelled, bookName ?? 'Songbook')
+            const heading = sectionHeading(shown, i, labelled, bookNames)
             return heading ? (
-              <Fragment key={tab.id}>
+              <Fragment key={pieceKey(tab)}>
                 <li>
                   <SectionHeading>{heading}</SectionHeading>
                 </li>

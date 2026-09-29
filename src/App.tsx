@@ -11,6 +11,7 @@ import { TabSidebar } from '@/components/TabSidebar'
 import { Toolbar } from '@/components/Toolbar'
 import { type UseAlphaTab, useAlphaTab } from '@/hooks/useAlphaTab'
 import { useCopyLink } from '@/hooks/useCopyLink'
+import { useFavorites } from '@/hooks/useFavorites'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { useFileImport } from '@/hooks/useFileImport'
 import { useFullscreen } from '@/hooks/useFullscreen'
@@ -27,6 +28,11 @@ import type { TabEntry } from '@/types'
 /** Every piece on offer: imports first, so they sit at the top of the sidebar. */
 function allPieces(imported: TabEntry[], book: Songbook | null): TabEntry[] {
   return book ? [...imported, ...book.tabs] : imported
+}
+
+/** Section headings for the sidebar, by book URL. */
+function bookNamesOf(book: Songbook | null): Record<string, string> {
+  return book ? { [book.url]: book.name } : {}
 }
 
 /** Loads the open piece into the score, starting at its top. */
@@ -147,7 +153,10 @@ export default function App() {
   const songbooks = useSongbooks()
   const book = songbooks.active
   const bookName = book ? book.name : null
+  const bookUrl = book ? book.url : null
   const allTabs = useMemo(() => allPieces(imports.imported, book), [imports.imported, book])
+  const bookNames = useMemo(() => bookNamesOf(book), [book])
+  const favorites = useFavorites(bookUrl)
   const settled = imports.ready && !songbooks.loading
 
   const score = useAlphaTab(canvasRef, viewportRef)
@@ -155,7 +164,7 @@ export default function App() {
 
   const selection = usePieceSelection({
     tabs: allTabs,
-    book,
+    bookUrl,
     settled,
     loadBook: songbooks.load,
     renderVersion: score.renderVersion,
@@ -209,8 +218,9 @@ export default function App() {
         {sidebarOpen && (
           <TabSidebar
             tabs={allTabs}
-            bookName={bookName}
-            selectedId={selection.selectedId}
+            bookNames={bookNames}
+            selectedKey={selection.selectedKey}
+            favorites={favorites}
             onSelect={select}
             onRemove={(id) => void imports.removeImported(id)}
             onExport={overlay.opener('export')}
@@ -239,6 +249,7 @@ export default function App() {
         {...overlay.dialogProps('export')}
         tabs={allTabs}
         bookName={bookName}
+        favorites={favorites}
         onSaveAndOpen={files.openBook}
       />
       <ShortcutHelp shortcuts={SHORTCUTS} {...overlay.dialogProps('help')} />

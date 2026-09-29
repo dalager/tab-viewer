@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PieceLink } from '@/hooks/usePieceSelection'
 import { piecePath, pieceUrl } from '@/lib/permalink'
+import type { PieceRef } from '@/lib/pieces'
 
 const COPIED_FEEDBACK_MS = 1500
 
@@ -9,7 +9,7 @@ const COPIED_FEEDBACK_MS = 1500
  * too. `link` is null when the piece cannot be linked; `bar` says which
  * (1-based) bar to link to when the copy happens.
  */
-export function useCopyLink(link: PieceLink | null, bar: () => number) {
+export function useCopyLink(link: PieceRef | null, bar: () => number) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {

@@ -8,6 +8,7 @@ import addFormats from 'ajv-formats'
 import { describe, expect, it } from 'vitest'
 import { exportSongbook } from '@/lib/exportSongbook'
 import { unpackSongbook } from '@/lib/sbk'
+import { IMPORTED_BOOK } from '@/lib/pieces'
 import { parseSongbook, SONGBOOK_SCHEMA } from '@/lib/songbook'
 import schema from '../public/schema/songbook-1.schema.json'
 
@@ -45,6 +46,7 @@ describe('songbook schema', () => {
 
   it('accepts what the exporter writes', async () => {
     const piece = (title: string) => ({
+      book: IMPORTED_BOOK,
       id: 'x',
       title,
       artist: '',
@@ -74,6 +76,10 @@ describe('parseSongbook format version', () => {
   it('reads format 1, and a manifest without a version as format 1', () => {
     expect(parseSongbook({ songbook: 1, songs }, BOOK_URL).tabs).toHaveLength(1)
     expect(parseSongbook({ songs }, BOOK_URL).tabs).toHaveLength(1)
+  })
+
+  it('records the book on every entry, since ids are only unique within it', () => {
+    expect(parseSongbook({ songs }, BOOK_URL).tabs[0].book).toBe(BOOK_URL.href)
   })
 
   it('refuses a newer format', () => {

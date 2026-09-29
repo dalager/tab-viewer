@@ -110,6 +110,8 @@ function checkVersion(json: Record<string, unknown>): void {
 interface SongContext {
   /** 0-based position in the manifest's list; errors name it 1-based. */
   index: number
+  /** The book's URL, which the entry records as its book. */
+  book: string
   /** Base for relative song URLs. */
   resolveFrom: URL
   /** Keeps ids distinct within the book. */
@@ -142,6 +144,7 @@ function parseSong(song: unknown, context: SongContext): TabEntry {
   const stem = fileStem(url)
 
   return {
+    book: context.book,
     id: context.uniqueId(slugify(optionalString(song.id) ?? stem) || `song-${n}`),
     title: optionalString(song.title) ?? (stem || `Song ${n}`),
     artist: optionalString(song.artist) ?? '',
@@ -164,7 +167,9 @@ export function parseSongbook(json: unknown, bookUrl: URL, resolveFrom = bookUrl
     url: bookUrl.href,
     name: optionalString(json.name) ?? (bookUrl.hostname || 'Untitled songbook'),
     description: optionalString(json.description),
-    tabs: json.songs.map((song, index) => parseSong(song, { index, resolveFrom, uniqueId })),
+    tabs: json.songs.map((song, index) =>
+      parseSong(song, { index, book: bookUrl.href, resolveFrom, uniqueId }),
+    ),
     release: () => {},
   }
 }
