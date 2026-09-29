@@ -1,6 +1,6 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isLocalBook } from '@/lib/localSongbooks'
-import { parseLocation, piecePath } from '@/lib/permalink'
+import { type Permalink, parseLocation, piecePath } from '@/lib/permalink'
 import {
   isImported,
   type PieceRef,
@@ -20,16 +20,15 @@ interface PendingBar {
   bar: number
 }
 
-/** The piece the address names, if any; `book` is null for a link without `?book=`. */
-function targetFromLocation(loc: Location = window.location): PieceTarget | null {
-  const { id, book } = parseLocation(loc)
+/** The piece a link names, if any; `book` is null for a link without `?book=`. */
+function targetOf({ id, book }: Permalink): PieceTarget | null {
   return id ? { id, book } : null
 }
 
-function pendingBarFrom(loc: Location): PendingBar | null {
-  const target = targetFromLocation(loc)
-  const { bar } = parseLocation(loc)
-  return target && bar ? { target, bar } : null
+/** The bar a link asks for, with the piece it is in. */
+function pendingBarOf(link: Permalink): PendingBar | null {
+  const target = targetOf(link)
+  return target && link.bar ? { target, bar: link.bar } : null
 }
 
 /** Whether a link's bar can be applied now: its piece is open and has rendered. */
@@ -97,7 +96,7 @@ function syncAddressBar(piece: TabEntry | null, book: string | null, tabs: TabEn
   const current = parseLocation()
   if (current.id === piece.id && current.book === book) return
   const target = piecePath(piece.id, null, book)
-  const shown = targetFromLocation()
+  const shown = targetOf(current)
   const known = tabs.some((t) => sameTarget(t, shown))
   if (known) window.history.pushState(null, '', target)
   else window.history.replaceState(null, '', target)
@@ -108,11 +107,12 @@ function syncAddressBar(piece: TabEntry | null, book: string | null, tabs: TabEn
  * piece, so later re-renders (zoom, tracks, layout) leave the reader where they are.
  */
 function usePendingBar(
+  startLink: Permalink,
   target: PieceTarget | null,
   renderVersion: number,
   seekToBar: (index: number) => void,
 ) {
-  const pendingBar = useRef<PendingBar | null>(pendingBarFrom(window.location))
+  const pendingBar = useRef<PendingBar | null>(pendingBarOf(startLink))
 
   // Read by effects that must not re-run when it changes: a new selection
   // must wait for its own render before a pending bar can be applied to it.
@@ -147,10 +147,11 @@ function isOtherBook(book: string | null, open: string | null): book is string {
 
 /** Back/Forward landed: select the piece in the address, loading its songbook first if needed. */
 function followPop(ctx: PopContext): void {
-  const target = targetFromLocation()
+  const link = parseLocation()
+  const target = targetOf(link)
   if (!target) return
   const { book } = target
-  const pending = pendingBarFrom(window.location)
+  const pending = pendingBarOf(link)
   if (!isOtherBook(book, ctx.bookUrlRef.current) && sameTarget(target, ctx.targetRef.current)) {
     // Same piece, already rendered: nothing will re-render, so jump now.
     ctx.pendingBar.current = null
@@ -185,10 +186,10 @@ function storedTarget(): PieceTarget | null {
   return stored ? parsePieceKey(stored) : null
 }
 
-/** The piece to open: the one the address names, or else the one open last time. */
-function useTarget() {
+/** The piece to open: the one the start link names, or else the one open last time. */
+function useTarget(startLink: Permalink) {
   const [target, setTarget] = useState<PieceTarget | null>(
-    () => targetFromLocation() ?? storedTarget(),
+    () => targetOf(startLink) ?? storedTarget(),
   )
   const select = useCallback((piece: PieceTarget) => {
     setTarget({ id: piece.id, book: piece.book })
@@ -219,11 +220,16 @@ function linkOf(piece: TabEntry | null, blocked: string | null): PieceRef | null
 }
 
 interface PieceSelectionOptions {
+  /** What the address named when the app started: a piece, a bar and its book. */
+  startLink: Permalink
   /** Every piece on offer, from every book. */
   tabs: TabEntry[]
   /** URL of the loaded songbook, which Back/Forward compares links against. */
   bookUrl: string | null
-  /** True once imports and the songbook have finished loading. */
+  /**
+   * True once imports and the book to start with have finished loading (or
+   * failed); until then a missing piece may still be on its way.
+   */
   settled: boolean
   loadBook: (url: string) => Promise<unknown>
   renderVersion: number
@@ -235,8 +241,8 @@ interface PieceSelectionOptions {
  * history and localStorage, including bar links and Back/Forward.
  */
 export function usePieceSelection(options: PieceSelectionOptions) {
-  const { tabs, bookUrl, settled, loadBook, renderVersion, seekToBar } = options
-  const { target, setTarget, select } = useTarget()
+  const { startLink, tabs, bookUrl, settled, loadBook, renderVersion, seekToBar } = options
+  const { target, setTarget, select } = useTarget(startLink)
   const selectedIndex = useMemo(() => tabs.findIndex((t) => sameTarget(t, target)), [tabs, target])
   const selected = tabs[selectedIndex] ?? null
   const selectedBook = linkedBook(selected)
@@ -246,7 +252,7 @@ export function usePieceSelection(options: PieceSelectionOptions) {
   const fallback = fallbackFor(settled, selected, target, tabs)
   if (fallback !== undefined) setTarget(fallback)
 
-  const { pendingBar, targetRef } = usePendingBar(target, renderVersion, seekToBar)
+  const { pendingBar, targetRef } = usePendingBar(startLink, target, renderVersion, seekToBar)
 
   // Stored with its book, so it reopens in the right one.
   useEffect(() => {

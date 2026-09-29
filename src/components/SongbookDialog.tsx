@@ -265,7 +265,8 @@ function RememberedList({ remembered, activeUrl, onClearAll, ...row }: Remembere
  * and the books loaded before. Shared by the dialog and the empty state.
  */
 export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPickerProps) {
-  const { active, remembered, loading, error, load, unload, forget, clearAll } = songbooks
+  const { active, remembered, status, error, load, unload, forget, clearAll } = songbooks
+  const loading = status === 'loading'
 
   const open = async (target: string) => {
     const book = await load(target)

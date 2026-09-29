@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteLocalSongbook, isLocalBook, storeLocalSongbook } from '@/lib/localSongbooks'
-import { parseLocation } from '@/lib/permalink'
 import {
   absoluteBookUrl,
   FIRST_VISIT_SONGBOOK,
@@ -20,13 +19,20 @@ export interface RememberedBook {
   description?: string
 }
 
+/**
+ * Where loading stands. `loading` from the very first render when there is a
+ * book to start with, so nothing mistakes the moment before its fetch starts
+ * for "no book": callers may wait for `status !== 'loading'`.
+ */
+export type SongbooksStatus = 'idle' | 'loading' | 'ready' | 'error'
+
 export interface UseSongbooks {
   /** The loaded songbook, or null when none is. */
   active: Songbook | null
   /** Books loaded before, most recent first. */
   remembered: RememberedBook[]
-  /** True while a book is being fetched, including the one to start with. */
-  loading: boolean
+  /** Whether a book is being fetched (the one to start with included), loaded, or failed. */
+  status: SongbooksStatus
   /** Last failure message, cleared by the next successful load. */
   error: string | null
   /** Fetches and activates a book. Resolves to it, or null if it failed or was superseded. */
@@ -55,19 +61,21 @@ function loadRemembered(): RememberedBook[] {
 }
 
 /**
- * A `?book=` link wins over the book left open last session. A first visit
- * with neither opens the bundled book; after that, an unloaded book stays
- * unloaded. Browsers that used the app before this marker existed count as
- * visited if they remember any book.
+ * The book to start with when no link names one: the book left open last
+ * session. A first visit opens the bundled book; after that, an unloaded
+ * book stays unloaded. Browsers that used the app before the visited marker
+ * existed count as visited if they remember any book.
  */
-function initialBookUrl(): string | null {
+function storedStartBook(): string | null {
   const firstVisit =
     localStorage.getItem(VISITED_KEY) === null && localStorage.getItem(REMEMBERED_KEY) === null
-  return (
-    parseLocation().book ??
-    localStorage.getItem(ACTIVE_KEY) ??
-    (firstVisit ? FIRST_VISIT_SONGBOOK : null)
-  )
+  return localStorage.getItem(ACTIVE_KEY) ?? (firstVisit ? FIRST_VISIT_SONGBOOK : null)
+}
+
+/** The book to start with, and the status that says it is on its way. */
+function startWith(linkedBook: string | null): { url: string | null; status: SongbooksStatus } {
+  const url = linkedBook ?? storedStartBook()
+  return { url, status: url ? 'loading' : 'idle' }
 }
 
 /** The remembered list with this book moved (or added) to the front. */
@@ -159,12 +167,17 @@ function useActiveBook() {
   return { active, activeRef, replace }
 }
 
-/** The active songbook and the history of ones loaded before, kept in localStorage. */
-export function useSongbooks(): UseSongbooks {
-  const [initialUrl] = useState(initialBookUrl)
+/**
+ * The active songbook and the history of ones loaded before, kept in
+ * localStorage. `linkedBook` is the book the address named at startup, which
+ * wins over the one left open last session.
+ */
+export function useSongbooks(linkedBook: string | null): UseSongbooks {
+  const [start] = useState(() => startWith(linkedBook))
+  const initialUrl = start.url
   const { active, activeRef, replace } = useActiveBook()
   const { remembered, remember, drop, dropAll } = useRememberedBooks()
-  const [loading, setLoading] = useState(initialUrl !== null)
+  const [status, setStatus] = useState(start.status)
   const [error, setError] = useState<string | null>(null)
 
   // Guards against a slow response overwriting a book picked after it.
@@ -172,7 +185,7 @@ export function useSongbooks(): UseSongbooks {
 
   /**
    * Fetch and activate, ignoring the result if a newer request superseded it.
-   * Callers flag `loading` themselves; the startup effect must not set state
+   * Callers set `status` to loading themselves; the startup effect must not set state
    * synchronously, so this only touches state once the fetch has settled.
    */
   const run = useCallback(
@@ -180,12 +193,13 @@ export function useSongbooks(): UseSongbooks {
       const token = ++loadToken.current
       const outcome = await loadLatest(url, () => token === loadToken.current)
       if (!outcome) return null
-      setLoading(false)
       if ('error' in outcome) {
+        setStatus('error')
         setError(outcome.error)
         return null
       }
       replace(outcome.book)
+      setStatus('ready')
       setError(null)
       remember(outcome.book)
       return outcome.book
@@ -198,7 +212,7 @@ export function useSongbooks(): UseSongbooks {
       // Already open: nothing to fetch, and re-parsing would reload the score.
       const open = activeRef.current
       if (isOpen(open, url)) return Promise.resolve(open)
-      setLoading(true)
+      setStatus('loading')
       return run(url)
     },
     [activeRef, run],
@@ -206,17 +220,17 @@ export function useSongbooks(): UseSongbooks {
 
   const openFile = useCallback(
     async (file: File) => {
-      setLoading(true)
+      setStatus('loading')
       const stored = await storeBookFile(file)
       if ('url' in stored) return run(stored.url)
-      setLoading(false)
+      setStatus('error')
       setError(stored.error)
       return null
     },
     [run],
   )
 
-  // The book to start with. `loading` was initialised to true for it.
+  // The book to start with. `status` was initialised to loading for it.
   useEffect(() => {
     if (initialUrl) void run(initialUrl)
   }, [initialUrl, run])
@@ -224,7 +238,7 @@ export function useSongbooks(): UseSongbooks {
   const unload = useCallback(() => {
     loadToken.current++
     replace(null)
-    setLoading(false)
+    setStatus('idle')
     setError(null)
   }, [replace])
 
@@ -241,5 +255,5 @@ export function useSongbooks(): UseSongbooks {
     dropAll()
   }, [unload, dropAll])
 
-  return { active, remembered, loading, error, load, openFile, unload, forget, clearAll }
+  return { active, remembered, status, error, load, openFile, unload, forget, clearAll }
 }

@@ -20,6 +20,7 @@ import { useImportedTabs } from '@/hooks/useImportedTabs'
 import { useOverlay } from '@/hooks/useOverlay'
 import { usePieceSelection } from '@/hooks/usePieceSelection'
 import { useSongbooks } from '@/hooks/useSongbooks'
+import { parseLocation } from '@/lib/permalink'
 import type { Songbook } from '@/lib/songbook'
 import { SPEED_STEP } from '@/score/settings'
 import { SHORTCUTS, type ShortcutActions } from '@/shortcuts'
@@ -150,19 +151,23 @@ export default function App() {
   const overlay = useOverlay()
 
   const imports = useImportedTabs()
-  const songbooks = useSongbooks()
+  // The address is read once, here: which book, piece and bar to open first.
+  // Back/Forward is followed by usePieceSelection from then on.
+  const [startLink] = useState(() => parseLocation())
+  const songbooks = useSongbooks(startLink.book)
   const book = songbooks.active
   const bookName = book ? book.name : null
   const bookUrl = book ? book.url : null
   const allTabs = useMemo(() => allPieces(imports.imported, book), [imports.imported, book])
   const bookNames = useMemo(() => bookNamesOf(book), [book])
   const favorites = useFavorites(bookUrl)
-  const settled = imports.ready && !songbooks.loading
+  const settled = imports.ready && songbooks.status !== 'loading'
 
   const score = useAlphaTab(canvasRef, viewportRef)
   const fullscreen = useFullscreen(shellRef)
 
   const selection = usePieceSelection({
+    startLink,
     tabs: allTabs,
     bookUrl,
     settled,
