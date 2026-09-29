@@ -3,7 +3,9 @@
 A browser-based reader and player for Guitar Pro tablature, built on
 [alphaTab](https://www.alphatab.net/), React and Vite. 
 
-Made for reading tabs in the cleanest way possible in a browser with no distractions.
+Made for reading tabs in the cleanest way possible in a browser with no distractions,
+and for practising them: mute a track to play it yourself, slow it down, and loop
+the whole piece or just the bars you select.
 
 Tabs can be imported as files, and organized in *songbooks*, exported as `.sbk` files (just zip files with json and tab files in it).
 
@@ -116,8 +118,9 @@ zip -r -X ../songbooks/bach-for-guitar.sbk songbook.json tabs
 ```
 
 Keep each song's `id` when editing: it is the stem of links like `/p/air`,
-and it is what favourites are stored by. Run `npm test` afterwards: it checks
-the edited `songbook.json` against the schema and for repeated ids.
+and favourites are stored by it, together with the book's URL. Run `npm test`
+afterwards: it checks the edited `songbook.json` against the schema and for
+repeated ids.
 
 ### About the transcriptions
 
@@ -150,8 +153,9 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 | `f`, `b`, `l` | Full screen, toggle sidebar, cycle layout |
 
 Click the star next to a piece in the sidebar to favourite it. Starred pieces
-are repeated in a *Starred* section at the top of the sidebar. Favourites and
-the last-opened piece are stored in the browser's `localStorage`.
+are repeated in a *Starred* section at the top of the sidebar. A star belongs
+to its songbook: the same piece in a copy of the book is starred separately.
+Favourites and the last-opened piece are stored in the browser's `localStorage`.
 
 ### Practising
 
@@ -165,6 +169,12 @@ the last-opened piece are stored in the browser's `localStorage`.
 
 Mutes and the selection belong to the open piece; loop, speed and the nylon
 guitar setting carry over to the next one.
+
+To try it, import `songbooks/MyJazzLick.gp5` (press `i`, or drop the file on
+the app): three bars with the lick on a *Guitar* track and the chords on a
+*Rhythm* track. Mute *Guitar* and play the lick over the chords. The file is
+also what the end-to-end tests practise on; the app itself only publishes the
+`.sbk` files in `songbooks/`.
 
 ### Links to pieces and bars
 
@@ -244,6 +254,7 @@ or, with nginx, `try_files $uri /index.html;` in the site's `location /`.
 ```sh
 npm run build     # production build into dist/
 npm run preview   # serve the production build locally
-npm run lint      # oxlint
-npm test          # vitest: the songbook schema checks in tests/
+npm run lint      # oxlint, including a complexity limit
+npm test          # vitest: unit tests, and the songbook schema checks
+npm run test:e2e  # Playwright: builds the app and drives it in Chromium
 ```
