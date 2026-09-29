@@ -106,6 +106,11 @@ that drops below 10 is a regression, not debt to schedule.
   conditional is ≥ 2 logical operators inside one `if`.
 - **Every `??`, `?.`, `&&`, `||` and ternary is a branch.**
   `book?.name ?? null` costs two.
+- **Wiring into a big hook can tip it over.** `useAlphaTab` scored 10 until
+  three lines composing a new hook took it to 8.82 (complexity 27): it had
+  been just under the limit. Review the files you *wire into*, not only the
+  new ones; the pre-commit safeguard is what caught it. The fix was the split
+  that was due anyway (`useInstance`, `useTransport`, `usePlayerSettings`).
 - **Fixing one smell exposes the next.** Expect Complex Method → Large Method
   → Overall Code Complexity (the file's mean) → Primitive Obsession (≥ 30%
   of arguments are primitives, e.g. `string`). Re-review after each step.
