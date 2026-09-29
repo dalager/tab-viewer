@@ -27,7 +27,7 @@ function duplicateIds(manifest: { songs: { id?: string }[] }): string[] {
   return ids.filter((id, i) => ids.indexOf(id) !== i)
 }
 
-const BOOK = 'https://example.com/book/songbook.json'
+const BOOK_URL = new URL('https://example.com/book/songbook.json')
 
 describe('songbook schema', () => {
   it('publishes its own URL as its $id', () => {
@@ -60,7 +60,7 @@ describe('songbook schema', () => {
     const { manifest } = unpackSongbook(new Uint8Array(await file.arrayBuffer()))
     expect(schemaErrors(manifest)).toEqual([])
     expect(duplicateIds(manifest as { songs: { id?: string }[] })).toEqual([])
-    expect(parseSongbook(manifest, BOOK, BOOK).tabs.map((t) => t.id)).toEqual([
+    expect(parseSongbook(manifest, BOOK_URL).tabs.map((t) => t.id)).toEqual([
       'air',
       'air-2',
       'no-2-gigue',
@@ -72,15 +72,15 @@ describe('parseSongbook format version', () => {
   const songs = [{ url: 'tabs/air.gp5' }]
 
   it('reads format 1, and a manifest without a version as format 1', () => {
-    expect(parseSongbook({ songbook: 1, songs }, BOOK, BOOK).tabs).toHaveLength(1)
-    expect(parseSongbook({ songs }, BOOK, BOOK).tabs).toHaveLength(1)
+    expect(parseSongbook({ songbook: 1, songs }, BOOK_URL).tabs).toHaveLength(1)
+    expect(parseSongbook({ songs }, BOOK_URL).tabs).toHaveLength(1)
   })
 
   it('refuses a newer format', () => {
-    expect(() => parseSongbook({ songbook: 2, songs }, BOOK, BOOK)).toThrow(/newer/)
+    expect(() => parseSongbook({ songbook: 2, songs }, BOOK_URL)).toThrow(/newer/)
   })
 
   it.each([0, '1', null, 1.5])('refuses format %j', (songbook) => {
-    expect(() => parseSongbook({ songbook, songs }, BOOK, BOOK)).toThrow(/unknown format/)
+    expect(() => parseSongbook({ songbook, songs }, BOOK_URL)).toThrow(/unknown format/)
   })
 })

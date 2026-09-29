@@ -93,65 +93,86 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Throws unless the manifest is in the one format this app reads. */
+function checkVersion(json: Record<string, unknown>): void {
+  // A missing version is 1: early manifests left it out.
+  const version = json.songbook === undefined ? SONGBOOK_VERSION : json.songbook
+  if (version === SONGBOOK_VERSION) return
+  const newer = Number.isInteger(version) && (version as number) > SONGBOOK_VERSION
+  throw new Error(
+    newer
+      ? `songbook format ${version} is newer than this app understands (format ${SONGBOOK_VERSION}); update the app`
+      : `not a songbook: unknown format ${JSON.stringify(version)}`,
+  )
+}
+
+/** What parsing one song needs to know about the book it is in. */
+interface SongContext {
+  /** 0-based position in the manifest's list; errors name it 1-based. */
+  index: number
+  /** Base for relative song URLs. */
+  resolveFrom: URL
+  /** Keeps ids distinct within the book. */
+  uniqueId: (base: string) => string
+}
+
+/** A song's `url`, resolved and checked to be http(s). */
+function songUrl(song: Record<string, unknown>, { index, resolveFrom }: SongContext): URL {
+  const where = `song ${index + 1}`
+  const rawUrl = optionalString(song.url)
+  if (!rawUrl) throw new Error(`${where}: missing "url"`)
+
+  let url: URL
+  try {
+    url = new URL(rawUrl, resolveFrom)
+  } catch {
+    throw new Error(`${where}: invalid url "${rawUrl}"`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`${where}: only http(s) urls are supported`)
+  }
+  return url
+}
+
+/** One manifest song as a sidebar entry. */
+function parseSong(song: unknown, context: SongContext): TabEntry {
+  const n = context.index + 1
+  if (!isRecord(song)) throw new Error(`song ${n}: expected an object`)
+  const url = songUrl(song, context)
+  const stem = fileStem(url)
+
+  return {
+    id: context.uniqueId(slugify(optionalString(song.id) ?? stem) || `song-${n}`),
+    title: optionalString(song.title) ?? (stem || `Song ${n}`),
+    artist: optionalString(song.artist) ?? '',
+    ext: url.pathname.split('.').pop()?.toLowerCase() ?? '',
+    file: url.href,
+  }
+}
+
 /**
  * Validate a parsed manifest and turn its songs into sidebar entries. Song
  * URLs resolve against `resolveFrom`, which is the book URL except inside a .sbk.
  */
-export function parseSongbook(json: unknown, bookUrl: string, resolveFrom: string): Songbook {
+export function parseSongbook(json: unknown, bookUrl: URL, resolveFrom = bookUrl): Songbook {
   if (!isRecord(json)) throw new Error('not a songbook: expected a JSON object')
-  // A missing version is 1: early manifests left it out.
-  const version = json.songbook === undefined ? SONGBOOK_VERSION : json.songbook
-  if (version !== SONGBOOK_VERSION) {
-    throw new Error(
-      Number.isInteger(version) && (version as number) > SONGBOOK_VERSION
-        ? `songbook format ${version} is newer than this app understands (format ${SONGBOOK_VERSION}); update the app`
-        : `not a songbook: unknown format ${JSON.stringify(version)}`,
-    )
-  }
+  checkVersion(json)
   if (!Array.isArray(json.songs)) throw new Error('not a songbook: missing a "songs" list')
 
   const uniqueId = idAllocator()
-  const tabs = json.songs.map((song, i): TabEntry => {
-    const where = `song ${i + 1}`
-    if (!isRecord(song)) throw new Error(`${where}: expected an object`)
-    const rawUrl = optionalString(song.url)
-    if (!rawUrl) throw new Error(`${where}: missing "url"`)
-
-    let url: URL
-    try {
-      url = new URL(rawUrl, resolveFrom)
-    } catch {
-      throw new Error(`${where}: invalid url "${rawUrl}"`)
-    }
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new Error(`${where}: only http(s) urls are supported`)
-    }
-
-    const stem = fileStem(url)
-    const base = slugify(optionalString(song.id) ?? stem) || `song-${i + 1}`
-
-    return {
-      id: uniqueId(base),
-      title: optionalString(song.title) ?? (stem || `Song ${i + 1}`),
-      artist: optionalString(song.artist) ?? '',
-      ext: url.pathname.split('.').pop()?.toLowerCase() ?? '',
-      file: url.href,
-    }
-  })
-
   return {
-    url: bookUrl,
-    name: optionalString(json.name) ?? (new URL(bookUrl).hostname || 'Untitled songbook'),
+    url: bookUrl.href,
+    name: optionalString(json.name) ?? (bookUrl.hostname || 'Untitled songbook'),
     description: optionalString(json.description),
-    tabs,
+    tabs: json.songs.map((song, index) => parseSong(song, { index, resolveFrom, uniqueId })),
     release: () => {},
   }
 }
 
 /** Parse a .sbk and point each packed song at a blob URL holding its bytes. */
-function openSbk(bytes: Uint8Array, bookUrl: string): Songbook {
+function openSbk(bytes: Uint8Array, bookUrl: URL): Songbook {
   const { manifest, root, read } = unpackSongbook(bytes)
-  const book = parseSongbook(manifest, bookUrl, `${ZIP_ORIGIN}/${root}`)
+  const book = parseSongbook(manifest, bookUrl, new URL(root, `${ZIP_ORIGIN}/`))
 
   const entryOf = (file: string) =>
     file.startsWith(`${ZIP_ORIGIN}/`) ? decodeURIComponent(new URL(file).pathname.slice(1)) : null
@@ -172,20 +193,20 @@ function openSbk(bytes: Uint8Array, bookUrl: string): Songbook {
 }
 
 export async function fetchSongbook(url: string): Promise<Songbook> {
-  let absolute: string
+  let absolute: URL
   try {
-    absolute = absoluteBookUrl(url)
+    absolute = new URL(absoluteBookUrl(url))
   } catch {
     throw new Error(`"${url}" is not a valid URL`)
   }
 
-  if (isLocalBook(absolute)) {
-    return openSbk(new Uint8Array(await readLocalSongbook(absolute)), absolute)
+  if (isLocalBook(absolute.href)) {
+    return openSbk(new Uint8Array(await readLocalSongbook(absolute.href)), absolute)
   }
 
   let response: Response
   try {
-    response = await fetch(absolute)
+    response = await fetch(absolute.href)
   } catch {
     // fetch rejects with an opaque TypeError for CORS and network failures.
     throw new Error(`could not reach ${absolute} (offline, or the host does not allow CORS)`)
@@ -202,5 +223,5 @@ export async function fetchSongbook(url: string): Promise<Songbook> {
   } catch {
     throw new Error(`${absolute} is neither a songbook JSON nor a .sbk file`)
   }
-  return parseSongbook(json, absolute, absolute)
+  return parseSongbook(json, absolute)
 }
