@@ -12,25 +12,35 @@ interface TrackPickerProps {
   onChange: (next: Set<number>) => void
 }
 
-export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
+/** How many tracks are shown, and the label saying so. */
+function describeSelection(tracks: ScoreTrack[], selected: Set<number>) {
   const isAll = selected.size === 0 || selected.size === tracks.length
   const activeCount = selected.size === 0 ? tracks.length : selected.size
-
+  const plural = tracks.length === 1 ? '' : 's'
   const label =
     tracks.length === 0
       ? 'No tracks'
       : isAll
-        ? `All ${tracks.length} track${tracks.length === 1 ? '' : 's'}`
+        ? `All ${tracks.length} track${plural}`
         : `${activeCount} of ${tracks.length} tracks`
+  return { isAll, activeCount, label }
+}
+
+/** The selection with one track flipped, or null if that would hide every track. */
+function toggled(tracks: ScoreTrack[], selected: Set<number>, index: number): Set<number> | null {
+  // An empty set means "all", so materialise it before removing anything.
+  const next = selected.size === 0 ? new Set(tracks.map((t) => t.index)) : new Set(selected)
+  if (next.has(index)) next.delete(index)
+  else next.add(index)
+  return next.size === 0 ? null : next
+}
+
+export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
+  const { isAll, activeCount, label } = describeSelection(tracks, selected)
 
   function toggle(index: number) {
-    // An empty set means "all", so materialise it before removing anything.
-    const current = selected.size === 0 ? new Set(tracks.map((t) => t.index)) : new Set(selected)
-    if (current.has(index)) current.delete(index)
-    else current.add(index)
-    // Never leave zero tracks rendered.
-    if (current.size === 0) return
-    onChange(current)
+    const next = toggled(tracks, selected, index)
+    if (next) onChange(next)
   }
 
   return (

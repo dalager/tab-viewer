@@ -110,87 +110,92 @@ function ToolButton({
   )
 }
 
-export function Toolbar(props: ToolbarProps) {
-  const { tab, tracks, scale, layout } = props
-  const horizontal = layout === 'horizontal'
-  const playerOff = !props.isPlayerReady
+const Divider = () => <Separator orientation="vertical" className="mx-1 h-6" />
 
+function PieceTitle({ tab }: Pick<ToolbarProps, 'tab'>) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-neutral-200 bg-white px-3">
-      <AppIcon className="mr-1 size-7 shrink-0 text-neutral-900" />
-
-      <ToolButton
-        icon={props.sidebarOpen ? PanelLeftClose : PanelLeftOpen}
-        label={props.sidebarOpen ? 'Hide list' : 'Show list'}
-        shortcut="b"
-        onClick={props.onToggleSidebar}
-      />
-
-      <Separator orientation="vertical" className="mx-1 h-6" />
-
-      <div className="min-w-0 flex-1 px-1">
-        <h1 className="truncate text-sm font-medium text-neutral-900">
-          {tab?.title ?? 'Select a piece'}
-        </h1>
-        {tab && (
-          <p className="truncate text-xs text-neutral-500">
-            {[tab.artist, tab.ext.toUpperCase()].filter(Boolean).join(' · ')}
-          </p>
-        )}
-      </div>
-
-      {props.bookName ? (
-        // The full name, now that the other controls are icons; the
-        // description (if any) is its tooltip.
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={props.onOpenSongbooks}
-          title={`${props.bookDescription ?? props.bookName}\n\nSwitch or unload songbooks (o)`}
-          className="shrink-0"
-        >
-          <BookOpen className="size-4" />
-          {props.bookName}
-        </Button>
-      ) : (
-        <ToolButton
-          icon={BookOpen}
-          label="Load a songbook"
-          shortcut="o"
-          onClick={props.onOpenSongbooks}
-        />
+    <div className="min-w-0 flex-1 px-1">
+      <h1 className="truncate text-sm font-medium text-neutral-900">
+        {tab?.title ?? 'Select a piece'}
+      </h1>
+      {tab && (
+        <p className="truncate text-xs text-neutral-500">
+          {[tab.artist, tab.ext.toUpperCase()].filter(Boolean).join(' · ')}
+        </p>
       )}
-      <ToolButton icon={Search} label="Search" shortcut="Ctrl+K" onClick={props.onOpenPalette} />
-      <ToolButton
-        icon={Upload}
-        label="Import"
-        title="Import Guitar Pro files or a .sbk (i), or drop them anywhere"
-        onClick={props.onImport}
-      />
-      <ToolButton
-        icon={props.linkCopied ? Check : Link}
-        label={props.linkCopied ? 'Link copied' : 'Copy link'}
-        title={props.linkBlocked ?? 'Copy link to this bar (c)'}
-        onClick={props.onCopyLink}
-        disabled={props.linkBlocked !== null}
-      />
+    </div>
+  )
+}
 
-      <Separator orientation="vertical" className="mx-1 h-6" />
+function SongbookButton({
+  bookName,
+  bookDescription,
+  onOpenSongbooks,
+}: Pick<ToolbarProps, 'bookName' | 'bookDescription' | 'onOpenSongbooks'>) {
+  if (!bookName) {
+    return (
+      <ToolButton icon={BookOpen} label="Load a songbook" shortcut="o" onClick={onOpenSongbooks} />
+    )
+  }
+  // The full name, now that the other controls are icons; the description
+  // (if any) is its tooltip.
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onOpenSongbooks}
+      title={`${bookDescription ?? bookName}\n\nSwitch or unload songbooks (o)`}
+      className="shrink-0"
+    >
+      <BookOpen className="size-4" />
+      {bookName}
+    </Button>
+  )
+}
 
+function CopyLinkButton({
+  linkCopied,
+  linkBlocked,
+  onCopyLink,
+}: Pick<ToolbarProps, 'linkCopied' | 'linkBlocked' | 'onCopyLink'>) {
+  return (
+    <ToolButton
+      icon={linkCopied ? Check : Link}
+      label={linkCopied ? 'Link copied' : 'Copy link'}
+      title={linkBlocked ?? 'Copy link to this bar (c)'}
+      onClick={onCopyLink}
+      disabled={linkBlocked !== null}
+    />
+  )
+}
+
+function ViewControls(
+  props: Pick<
+    ToolbarProps,
+    | 'tracks'
+    | 'selectedTracks'
+    | 'onTracksChange'
+    | 'layout'
+    | 'onCycleLayout'
+    | 'scale'
+    | 'onZoom'
+    | 'onResetZoom'
+  >,
+) {
+  return (
+    <>
       <TrackPicker
-        tracks={tracks}
+        tracks={props.tracks}
         selected={props.selectedTracks}
         onChange={props.onTracksChange}
       />
       <ToolButton
-        icon={horizontal ? MoveHorizontal : FileText}
-        label={`Layout: ${LAYOUT_LABELS[layout]}`}
+        icon={props.layout === 'horizontal' ? MoveHorizontal : FileText}
+        label={`Layout: ${LAYOUT_LABELS[props.layout]}`}
         shortcut="l"
         onClick={props.onCycleLayout}
       />
-
-      <Separator orientation="vertical" className="mx-1 h-6" />
-
+      <Divider />
       <ToolButton
         icon={ZoomOut}
         label="Zoom out"
@@ -203,12 +208,31 @@ export function Toolbar(props: ToolbarProps) {
         className="w-11 text-center text-xs tabular-nums text-neutral-600 hover:text-neutral-900"
         title="Reset zoom (0)"
       >
-        {Math.round(scale * 100)}%
+        {Math.round(props.scale * 100)}%
       </button>
       <ToolButton icon={ZoomIn} label="Zoom in" shortcut="+" onClick={() => props.onZoom(0.1)} />
+    </>
+  )
+}
 
-      <Separator orientation="vertical" className="mx-1 h-6" />
-
+function PlaybackControls(
+  props: Pick<
+    ToolbarProps,
+    | 'isPlayerReady'
+    | 'isPlaying'
+    | 'onPlayPause'
+    | 'onStop'
+    | 'speed'
+    | 'onSpeedChange'
+    | 'metronome'
+    | 'onToggleMetronome'
+    | 'guitarOnly'
+    | 'onToggleGuitarOnly'
+  >,
+) {
+  const playerOff = !props.isPlayerReady
+  return (
+    <>
       <ToolButton
         icon={props.isPlaying ? Pause : Play}
         label={props.isPlaying ? 'Pause' : 'Play'}
@@ -240,8 +264,40 @@ export function Toolbar(props: ToolbarProps) {
         disabled={playerOff}
         pressed={props.guitarOnly}
       />
+    </>
+  )
+}
 
-      <Separator orientation="vertical" className="mx-1 h-6" />
+export function Toolbar(props: ToolbarProps) {
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-neutral-200 bg-white px-3">
+      <AppIcon className="mr-1 size-7 shrink-0 text-neutral-900" />
+
+      <ToolButton
+        icon={props.sidebarOpen ? PanelLeftClose : PanelLeftOpen}
+        label={props.sidebarOpen ? 'Hide list' : 'Show list'}
+        shortcut="b"
+        onClick={props.onToggleSidebar}
+      />
+
+      <Divider />
+
+      <PieceTitle tab={props.tab} />
+      <SongbookButton {...props} />
+      <ToolButton icon={Search} label="Search" shortcut="Ctrl+K" onClick={props.onOpenPalette} />
+      <ToolButton
+        icon={Upload}
+        label="Import"
+        title="Import Guitar Pro files or a .sbk (i), or drop them anywhere"
+        onClick={props.onImport}
+      />
+      <CopyLinkButton {...props} />
+
+      <Divider />
+      <ViewControls {...props} />
+      <Divider />
+      <PlaybackControls {...props} />
+      <Divider />
 
       <ToolButton
         icon={props.isFullscreen ? Minimize : Maximize}

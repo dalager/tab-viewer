@@ -24,6 +24,16 @@ interface ExportFormProps {
   onDone: () => void
 }
 
+/** A copy of the selection with every id in `ids` switched on or off. */
+function withIds(selected: Set<string>, ids: string[], on: boolean): Set<string> {
+  const next = new Set(selected)
+  for (const id of ids) {
+    if (on) next.add(id)
+    else next.delete(id)
+  }
+  return next
+}
+
 /**
  * Mounted only while the dialog is open, so each opening starts fresh: the
  * starred pieces preselected and favorites read as they are now.
@@ -44,15 +54,7 @@ function ExportForm({ tabs, bookName, onSaveAndOpen, onDone }: ExportFormProps) 
   const shown = useMemo(() => filterTabs(tabs, query), [tabs, query])
 
   const setMany = useCallback(
-    (ids: string[], on: boolean) =>
-      setSelected((prev) => {
-        const next = new Set(prev)
-        for (const id of ids) {
-          if (on) next.add(id)
-          else next.delete(id)
-        }
-        return next
-      }),
+    (ids: string[], on: boolean) => setSelected((prev) => withIds(prev, ids, on)),
     [],
   )
 

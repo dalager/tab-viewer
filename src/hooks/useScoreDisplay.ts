@@ -32,35 +32,10 @@ export interface ScoreDisplay {
   topVisibleBar: () => number
 }
 
-/**
- * How the open score is shown: zoom, layout, which tracks, and scrolling
- * through it. Part of useAlphaTab, which hands it the instance; nothing
- * outside the score hooks touches alphaTab's display settings or bounds.
- */
-export function useScoreDisplay(
-  api: alphaTab.AlphaTabApi | null,
-  score: alphaTab.model.Score | null,
-  renderVersion: number,
-  viewportRef: RefObject<HTMLDivElement | null>,
-): ScoreDisplay {
+/** Zoom and layout, applied to the instance and re-rendered. */
+function useDisplaySettings(api: alphaTab.AlphaTabApi | null) {
   const [scale, setScale] = useState(1)
   const [layout, setLayout] = useState<Layout>('page')
-  const [selectedTracks, setSelected] = useState<Set<number>>(new Set())
-  const tracks = useMemo(() => score?.tracks.map(toScoreTrack) ?? [], [score])
-
-  // A new score is loaded with every track, so the selection starts over.
-  // Adjusting during render rather than in an effect avoids a second pass.
-  const [tracksScore, setTracksScore] = useState(score)
-  if (tracksScore !== score) {
-    setTracksScore(score)
-    setSelected(new Set())
-  }
-
-  // Staff-system boundaries, re-read once each render's bounds lookup exists.
-  const systemTops = useRef<number[]>([])
-  useEffect(() => {
-    systemTops.current = computeSystemTops(api, viewportRef.current)
-  }, [api, renderVersion, viewportRef])
 
   const applyDisplay = useCallback(
     (mutate: (display: alphaTab.DisplaySettings) => void) => {
@@ -94,11 +69,39 @@ export function useScoreDisplay(
     })
   }, [layout, applyDisplay])
 
+  return { scale, zoomBy, resetZoom, layout, cycleLayout }
+}
+
+/** The tracks alphaTab should render, `indexes` empty meaning all of them. */
+function tracksToRender(score: alphaTab.model.Score, indexes: Set<number>): alphaTab.model.Track[] {
+  return indexes.size === 0 ? score.tracks : score.tracks.filter((t) => indexes.has(t.index))
+}
+
+/** Every track if only the first is shown, else only the first; null without tracks. */
+function firstOnlyToggled(tracks: ScoreTrack[], selected: Set<number>): Set<number> | null {
+  if (tracks.length === 0) return null
+  const first = tracks[0].index
+  const firstOnly = selected.size === 1 && selected.has(first)
+  return firstOnly ? new Set() : new Set([first])
+}
+
+/** Which tracks are rendered; a new score starts with all of them. */
+function useTrackSelection(api: alphaTab.AlphaTabApi | null, score: alphaTab.model.Score | null) {
+  const [selectedTracks, setSelected] = useState<Set<number>>(new Set())
+  const tracks = useMemo(() => score?.tracks.map(toScoreTrack) ?? [], [score])
+
+  // A new score is loaded with every track, so the selection starts over.
+  // Adjusting during render rather than in an effect avoids a second pass.
+  const [tracksScore, setTracksScore] = useState(score)
+  if (tracksScore !== score) {
+    setTracksScore(score)
+    setSelected(new Set())
+  }
+
   const setSelectedTracks = useCallback(
     (indexes: Set<number>) => {
-      const all = api?.score?.tracks
-      if (!api || !all) return
-      const shown = indexes.size === 0 ? all : all.filter((t) => indexes.has(t.index))
+      if (!api?.score) return
+      const shown = tracksToRender(api.score, indexes)
       if (shown.length === 0) return
       setSelected(indexes)
       api.renderTracks(shown)
@@ -107,20 +110,36 @@ export function useScoreDisplay(
   )
 
   const toggleFirstTrackOnly = useCallback(() => {
-    if (tracks.length === 0) return
-    const first = tracks[0].index
-    const firstOnly = selectedTracks.size === 1 && selectedTracks.has(first)
-    setSelectedTracks(firstOnly ? new Set() : new Set([first]))
+    const next = firstOnlyToggled(tracks, selectedTracks)
+    if (next) setSelectedTracks(next)
   }, [tracks, selectedTracks, setSelectedTracks])
+
+  return { tracks, selectedTracks, setSelectedTracks, toggleFirstTrackOnly }
+}
+
+/** Paging and bar lookup over the rendered score, in the given layout. */
+function useScrolling(
+  api: alphaTab.AlphaTabApi | null,
+  renderVersion: number,
+  viewportRef: RefObject<HTMLDivElement | null>,
+  layout: Layout,
+) {
+  // Staff-system boundaries, re-read once each render's bounds lookup exists.
+  const systemTops = useRef<number[]>([])
+  useEffect(() => {
+    systemTops.current = computeSystemTops(api, viewportRef.current)
+  }, [api, renderVersion, viewportRef])
+
+  const horizontal = layout === 'horizontal'
 
   const page = useCallback(
     (direction: 1 | -1, size: 'full' | 'half' = 'full') => {
-      const viewport = viewportRef.current
-      if (!viewport) return
       const fraction = size === 'full' ? PAGE_FRACTION : PAGE_FRACTION / 2
-      pageBy(viewport, systemTops.current, direction, layout === 'horizontal', fraction)
+      if (viewportRef.current) {
+        pageBy(viewportRef.current, systemTops.current, direction, horizontal, fraction)
+      }
     },
-    [viewportRef, layout],
+    [viewportRef, horizontal],
   )
 
   const toEdge = useCallback(
@@ -133,23 +152,26 @@ export function useScoreDisplay(
   const topVisibleBar = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport) return 0
-    const horizontal = layout === 'horizontal'
     const position = horizontal ? viewport.scrollLeft : viewport.scrollTop
     return firstVisibleBar(barStarts(api, viewport, horizontal), position)
-  }, [api, viewportRef, layout])
+  }, [api, viewportRef, horizontal])
 
-  return {
-    scale,
-    zoomBy,
-    resetZoom,
-    layout,
-    cycleLayout,
-    tracks,
-    selectedTracks,
-    setSelectedTracks,
-    toggleFirstTrackOnly,
-    page,
-    scrollToEdge: toEdge,
-    topVisibleBar,
-  }
+  return { page, scrollToEdge: toEdge, topVisibleBar }
+}
+
+/**
+ * How the open score is shown: zoom, layout, which tracks, and scrolling
+ * through it. Part of useAlphaTab, which hands it the instance; nothing
+ * outside the score hooks touches alphaTab's display settings or bounds.
+ */
+export function useScoreDisplay(
+  api: alphaTab.AlphaTabApi | null,
+  score: alphaTab.model.Score | null,
+  renderVersion: number,
+  viewportRef: RefObject<HTMLDivElement | null>,
+): ScoreDisplay {
+  const settings = useDisplaySettings(api)
+  const trackSelection = useTrackSelection(api, score)
+  const scrolling = useScrolling(api, renderVersion, viewportRef, settings.layout)
+  return { ...settings, ...trackSelection, ...scrolling }
 }

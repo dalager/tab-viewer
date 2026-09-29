@@ -74,6 +74,29 @@ async function toRecord(file: File): Promise<ImportedRecord> {
   }
 }
 
+/** Stores each file, collecting the entries added and a message per failure. */
+async function storeAll(files: Iterable<File>): Promise<{ added: TabEntry[]; failures: string[] }> {
+  const added: TabEntry[] = []
+  const failures: string[] = []
+  for (const file of files) {
+    try {
+      const record = await toRecord(file)
+      await putImported(record)
+      added.push(toEntry(record))
+    } catch (e) {
+      failures.push(errorMessage(e))
+    }
+  }
+  return { added, failures }
+}
+
+/** The list without that piece, freeing its blob URL. */
+function withoutImport(tabs: TabEntry[], id: string): TabEntry[] {
+  const gone = tabs.find((t) => t.id === id)
+  if (gone) URL.revokeObjectURL(gone.file)
+  return tabs.filter((t) => t.id !== id)
+}
+
 /**
  * User-imported pieces, persisted in IndexedDB so they survive a reload.
  *
@@ -105,19 +128,7 @@ export function useImportedTabs(): UseImportedTabs {
   }, [])
 
   const importFiles = useCallback(async (files: Iterable<File>) => {
-    const added: TabEntry[] = []
-    const failures: string[] = []
-
-    for (const file of files) {
-      try {
-        const record = await toRecord(file)
-        await putImported(record)
-        added.push(toEntry(record))
-      } catch (e) {
-        failures.push(errorMessage(e))
-      }
-    }
-
+    const { added, failures } = await storeAll(files)
     if (added.length > 0) setImported((prev) => [...prev, ...added])
     setError(failures.length > 0 ? failures.join('\n') : null)
     return added.map((t) => t.id)
@@ -130,11 +141,7 @@ export function useImportedTabs(): UseImportedTabs {
       setError(errorMessage(e))
       return
     }
-    setImported((prev) => {
-      const gone = prev.find((t) => t.id === id)
-      if (gone) URL.revokeObjectURL(gone.file)
-      return prev.filter((t) => t.id !== id)
-    })
+    setImported((prev) => withoutImport(prev, id))
   }, [])
 
   return { imported, ready, error, importFiles, removeImported }

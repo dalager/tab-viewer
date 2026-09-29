@@ -27,39 +27,47 @@ export interface UnpackedSongbook {
   read: (names: Set<string>) => Record<string, Uint8Array>
 }
 
-/** Reads the manifest and checks the zip's size limits; the files are unpacked on demand. */
-export function unpackSongbook(bytes: Uint8Array): UnpackedSongbook {
-  const entries: UnzipFileInfo[] = []
-  const isManifest = (name: string) => name === MANIFEST || /^[^/]+\/songbook\.json$/.test(name)
+const isManifest = (name: string) => name === MANIFEST || /^[^/]+\/songbook\.json$/.test(name)
 
-  let manifests: Record<string, Uint8Array>
+/** Lists every entry but inflates only the manifests, in one pass. */
+function scanZip(bytes: Uint8Array) {
+  const entries: UnzipFileInfo[] = []
   try {
-    // One pass lists every entry (the filter sees them all) but inflates only the manifest.
-    manifests = unzipSync(bytes, {
+    const manifests = unzipSync(bytes, {
       filter: (file) => {
         entries.push(file)
         return isManifest(file.name)
       },
     })
+    return { entries, manifests }
   } catch (e) {
     throw new Error(`not a readable zip (${errorMessage(e)})`)
   }
+}
 
+/** Refuses a zip too large to unpack in the browser, such as a zip bomb. */
+function checkLimits(entries: UnzipFileInfo[]): void {
   if (entries.length > MAX_ENTRIES) throw new Error(`more than ${MAX_ENTRIES} files`)
   const unpacked = entries.reduce((sum, f) => sum + f.originalSize, 0)
   if (unpacked > MAX_UNPACKED_BYTES) throw new Error('unpacks to more than 200 MB')
+}
 
-  // Prefer a root-level manifest over one in a folder.
+/** The manifest to use, preferring a root-level one over one in a folder. */
+function pickManifest(manifests: Record<string, Uint8Array>): { name: string; manifest: unknown } {
   const name = Object.keys(manifests).sort((a, b) => a.length - b.length)[0]
   if (!name) throw new Error(`no ${MANIFEST} inside`)
-
-  let manifest: unknown
   try {
-    manifest = JSON.parse(new TextDecoder().decode(manifests[name]))
+    return { name, manifest: JSON.parse(new TextDecoder().decode(manifests[name])) }
   } catch {
     throw new Error(`${name} is not JSON`)
   }
+}
 
+/** Reads the manifest and checks the zip's size limits; the files are unpacked on demand. */
+export function unpackSongbook(bytes: Uint8Array): UnpackedSongbook {
+  const { entries, manifests } = scanZip(bytes)
+  checkLimits(entries)
+  const { name, manifest } = pickManifest(manifests)
   return {
     manifest,
     root: name.slice(0, -MANIFEST.length),

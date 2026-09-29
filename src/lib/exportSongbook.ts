@@ -16,26 +16,22 @@ interface ExportRequest {
   compress: boolean
 }
 
-export async function exportSongbook({
-  name,
-  description,
-  tabs,
-  compress,
-}: ExportRequest): Promise<File> {
-  const title = name.trim()
-  if (!title) throw new Error('give the songbook a name')
-  if (tabs.length === 0) throw new Error('select at least one piece')
-
-  // Every piece's file is a URL (blob: for imports and .sbk pieces), so one fetch covers all.
-  const bytes = await Promise.all(
+/** Every piece's bytes, in order. Every file is a URL (blob: for imports and .sbk pieces). */
+function readAll(tabs: TabEntry[]): Promise<Uint8Array[]> {
+  return Promise.all(
     tabs.map((tab) =>
       fetchBytes(tab.file).catch((e: unknown) => {
         throw new Error(`"${tab.title}" could not be read (${errorMessage(e)})`)
       }),
     ),
   )
+}
 
-  // Fresh ids from the titles: imports carry opaque "imported-<uuid>" ones.
+/**
+ * The manifest's song list and the files it points at. Ids are fresh, from
+ * the titles: imports carry opaque "imported-<uuid>" ones.
+ */
+function layOut(tabs: TabEntry[], bytes: Uint8Array[]) {
   const uniqueId = idAllocator()
   const files: Record<string, Uint8Array> = {}
   const songs = tabs.map((tab, i) => {
@@ -44,12 +40,27 @@ export async function exportSongbook({
     files[url] = bytes[i]
     return { id, title: tab.title, ...(tab.artist && { artist: tab.artist }), url }
   })
+  return { songs, files }
+}
+
+function checkRequest({ name, tabs }: ExportRequest): string {
+  const title = name.trim()
+  if (!title) throw new Error('give the songbook a name')
+  if (tabs.length === 0) throw new Error('select at least one piece')
+  return title
+}
+
+export async function exportSongbook(request: ExportRequest): Promise<File> {
+  const title = checkRequest(request)
+  const { tabs, compress } = request
+  const { songs, files } = layOut(tabs, await readAll(tabs))
+  const description = request.description.trim()
 
   const manifest = {
     $schema: SONGBOOK_SCHEMA,
     songbook: SONGBOOK_VERSION,
     name: title,
-    ...(description.trim() && { description: description.trim() }),
+    ...(description && { description }),
     songs,
   }
   const zip = packSongbook(manifest, files, compress ? 6 : 0)
