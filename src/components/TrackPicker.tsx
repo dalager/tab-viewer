@@ -1,8 +1,9 @@
-import { Layers } from 'lucide-react'
+import { Layers, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import type { ScoreTrack } from '@/score/tracks'
 
 interface TrackPickerProps {
@@ -10,6 +11,29 @@ interface TrackPickerProps {
   /** Selected track indexes. Empty means every track. */
   selected: Set<number>
   onChange: (next: Set<number>) => void
+  /** Indexes of silenced tracks; they still show, but do not play. */
+  muted: Set<number>
+  onToggleMute: (index: number) => void
+}
+
+function MuteButton({ track, muted, onToggle }: { track: ScoreTrack; muted: boolean; onToggle: () => void }) {
+  const Icon = muted ? VolumeX : Volume2
+  const label = `${muted ? 'Unmute' : 'Mute'} ${track.name}`
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      aria-pressed={muted}
+      title={muted ? `${track.name} is muted: play it yourself` : `Mute ${track.name}`}
+      className={cn(
+        'shrink-0 rounded-md p-1.5 transition-colors hover:text-neutral-900',
+        muted ? 'text-red-600' : 'text-neutral-400',
+      )}
+    >
+      <Icon className="size-4" />
+    </button>
+  )
 }
 
 /** How many tracks are shown, and the label saying so. */
@@ -35,7 +59,7 @@ function toggled(tracks: ScoreTrack[], selected: Set<number>, index: number): Se
   return next.size === 0 ? null : next
 }
 
-export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
+export function TrackPicker({ tracks, selected, onChange, muted, onToggleMute }: TrackPickerProps) {
   const { isAll, activeCount, label } = describeSelection(tracks, selected)
 
   function toggle(index: number) {
@@ -95,8 +119,8 @@ export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
           {tracks.map((track) => {
             const checked = selected.size === 0 || selected.has(track.index)
             return (
-              <li key={track.index}>
-                <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-neutral-100">
+              <li key={track.index} className="flex items-center gap-1">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-neutral-100">
                   <Checkbox checked={checked} onCheckedChange={() => toggle(track.index)} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-neutral-900">
@@ -107,6 +131,11 @@ export function TrackPicker({ tracks, selected, onChange }: TrackPickerProps) {
                     </span>
                   </span>
                 </label>
+                <MuteButton
+                  track={track}
+                  muted={muted.has(track.index)}
+                  onToggle={() => onToggleMute(track.index)}
+                />
               </li>
             )
           })}

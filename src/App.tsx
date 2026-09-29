@@ -74,6 +74,12 @@ function toolbarProps(ctx: ToolbarContext): React.ComponentProps<typeof Toolbar>
     tracks: score.tracks,
     selectedTracks: score.selectedTracks,
     onTracksChange: score.setSelectedTracks,
+    mutedTracks: score.mutedTracks,
+    onToggleMute: score.toggleMute,
+    looping: score.looping,
+    onToggleLooping: score.toggleLooping,
+    selection: score.selection,
+    onClearSelection: score.clearSelection,
     scale: score.scale,
     layout: score.layout,
     isFullscreen: fullscreen.isFullscreen,
@@ -105,6 +111,13 @@ function toolbarProps(ctx: ToolbarContext): React.ComponentProps<typeof Toolbar>
   }
 }
 
+/** Escape backs out one step: a dialog, else a selection, else full screen. */
+function escape({ overlay, score, fullscreen }: ShortcutContext): void {
+  if (overlay.isOpen) overlay.close()
+  else if (score.selection) score.clearSelection()
+  else void fullscreen.exit()
+}
+
 /** What each keyboard shortcut in SHORTCUTS does. */
 function shortcutActions(ctx: ShortcutContext): ShortcutActions {
   const { score, selection, overlay, files, fullscreen } = ctx
@@ -133,11 +146,12 @@ function shortcutActions(ctx: ShortcutContext): ShortcutActions {
     stop: score.stop,
     toggleMetronome: score.toggleMetronome,
     toggleGuitarOnly: score.toggleGuitarOnly,
+    toggleLoop: score.toggleLooping,
     slower: () => score.nudgeSpeed(-SPEED_STEP),
     faster: () => score.nudgeSpeed(SPEED_STEP),
     resetSpeed: () => score.setSpeed(1),
     toggleHelp: () => overlay.toggle('help'),
-    escape: () => (overlay.isOpen ? overlay.close() : void fullscreen.exit()),
+    escape: () => escape(ctx),
   }
 }
 

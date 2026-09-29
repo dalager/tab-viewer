@@ -30,6 +30,7 @@ export type ShortcutAction =
   | 'stop'
   | 'toggleMetronome'
   | 'toggleGuitarOnly'
+  | 'toggleLoop'
   | 'slower'
   | 'faster'
   | 'resetSpeed'
@@ -90,12 +91,13 @@ export const SHORTCUTS: readonly Shortcut<ShortcutAction>[] = [
   playback(['s'], 'Stop', 'stop'),
   playback(['m'], 'Toggle metronome', 'toggleMetronome'),
   playback(['g'], 'Play everything on nylon guitar', 'toggleGuitarOnly'),
+  playback(['r'], 'Loop the selection, or the whole piece', 'toggleLoop'),
   playback([','], 'Slower', 'slower'),
   playback(['.'], 'Faster', 'faster'),
   playback(['\\'], 'Reset speed to 100%', 'resetSpeed'),
 
   overlays(['?'], 'Toggle this help', 'toggleHelp', { allowInOverlay: true }),
-  overlays(['Escape'], 'Close overlay, else leave full screen', 'escape', {
+  overlays(['Escape'], 'Close overlay, else clear the selection, else leave full screen', 'escape', {
     label: 'Esc',
     allowInOverlay: true,
   }),

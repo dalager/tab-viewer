@@ -12,6 +12,7 @@ import {
   MoveHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  Repeat,
   Pause,
   Play,
   Search,
@@ -19,6 +20,7 @@ import {
   Upload,
   ZoomIn,
   ZoomOut,
+  X,
 } from 'lucide-react'
 import { AppIcon } from '@/components/AppIcon'
 import { SpeedControl } from '@/components/SpeedControl'
@@ -27,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { LAYOUT_LABELS, type Layout } from '@/score/settings'
+import type { BarRange } from '@/score/range'
 import type { ScoreTrack } from '@/score/tracks'
 import type { TabEntry } from '@/types'
 
@@ -35,6 +38,13 @@ interface ToolbarProps {
   tracks: ScoreTrack[]
   selectedTracks: Set<number>
   onTracksChange: (next: Set<number>) => void
+  mutedTracks: Set<number>
+  onToggleMute: (index: number) => void
+  looping: boolean
+  onToggleLooping: () => void
+  /** The bars playback is limited to, or null for the whole piece. */
+  selection: BarRange | null
+  onClearSelection: () => void
   scale: number
   layout: Layout
   isFullscreen: boolean
@@ -175,6 +185,8 @@ function ViewControls(
     | 'tracks'
     | 'selectedTracks'
     | 'onTracksChange'
+    | 'mutedTracks'
+    | 'onToggleMute'
     | 'layout'
     | 'onCycleLayout'
     | 'scale'
@@ -188,6 +200,8 @@ function ViewControls(
         tracks={props.tracks}
         selected={props.selectedTracks}
         onChange={props.onTracksChange}
+        muted={props.mutedTracks}
+        onToggleMute={props.onToggleMute}
       />
       <ToolButton
         icon={props.layout === 'horizontal' ? MoveHorizontal : FileText}
@@ -215,6 +229,31 @@ function ViewControls(
   )
 }
 
+/** "Bars 3–6" while a selection limits playback; clicking it plays the whole piece again. */
+function SelectionChip({
+  selection,
+  onClearSelection,
+}: Pick<ToolbarProps, 'selection' | 'onClearSelection'>) {
+  if (!selection) return null
+  const bars =
+    selection.first === selection.last
+      ? `Bar ${selection.first + 1}`
+      : `Bars ${selection.first + 1}–${selection.last + 1}`
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={onClearSelection}
+      aria-label={`${bars} selected: play the whole piece`}
+      title={`Playing only ${bars.toLowerCase()}. Click, or press Esc, to play the whole piece.`}
+      className="h-7 gap-1 px-2 text-xs tabular-nums"
+    >
+      {bars}
+      <X className="size-3.5" />
+    </Button>
+  )
+}
+
 function PlaybackControls(
   props: Pick<
     ToolbarProps,
@@ -228,6 +267,10 @@ function PlaybackControls(
     | 'onToggleMetronome'
     | 'guitarOnly'
     | 'onToggleGuitarOnly'
+    | 'looping'
+    | 'onToggleLooping'
+    | 'selection'
+    | 'onClearSelection'
   >,
 ) {
   const playerOff = !props.isPlayerReady
@@ -264,6 +307,15 @@ function PlaybackControls(
         disabled={playerOff}
         pressed={props.guitarOnly}
       />
+      <ToolButton
+        icon={Repeat}
+        label={props.selection ? 'Loop the selection' : 'Loop the piece'}
+        shortcut="r"
+        onClick={props.onToggleLooping}
+        disabled={playerOff}
+        pressed={props.looping}
+      />
+      <SelectionChip selection={props.selection} onClearSelection={props.onClearSelection} />
     </>
   )
 }

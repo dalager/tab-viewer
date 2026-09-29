@@ -144,6 +144,7 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 | `,` / `.` / `\` | Slower / faster / reset to 100% |
 | `m` | Toggle the metronome |
 | `g` | Play everything on nylon guitar |
+| `r` | Loop the selection, or the whole piece |
 | `t` | Show all tracks / first track only |
 | `+` / `-` / `0` | Zoom in / out / reset |
 | `f`, `b`, `l` | Full screen, toggle sidebar, cycle layout |
@@ -151,6 +152,19 @@ Press `?` in the app for the full list of keyboard shortcuts. The essentials:
 Click the star next to a piece in the sidebar to favourite it. Starred pieces
 are repeated in a *Starred* section at the top of the sidebar. Favourites and
 the last-opened piece are stored in the browser's `localStorage`.
+
+### Practising
+
+- **Play along:** open the track list (the layers button in the toolbar) and
+  click the speaker next to a track to mute it. The track stays on screen but
+  goes silent, so you can play that part yourself; the others keep playing.
+- **Loop:** press `r`, or click the loop button, to start over at the end.
+- **Loop a passage:** drag across the score to select bars. Playback then
+  covers only the selection (looping it, with loop on), and the toolbar shows
+  which bars. A plain click in the score, `Esc`, or the bars button clears it.
+
+Mutes and the selection belong to the open piece; loop, speed and the nylon
+guitar setting carry over to the next one.
 
 ### Links to pieces and bars
 
