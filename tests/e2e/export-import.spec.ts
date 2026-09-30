@@ -1,6 +1,6 @@
 // Exporting pieces to a new .sbk, opening one from a file, and importing tabs.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import {
   BOOK_NAME,
   expectOpenPiece,

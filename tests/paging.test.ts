@@ -2,7 +2,7 @@
 // math against fake viewports. The boundaries themselves are plain numbers.
 
 import { describe, expect, it, vi } from 'vitest'
-import { firstVisibleBar, pageBy } from '@/score/paging'
+import { firstVisibleBar, pageBy, scrollToEdge } from '@/score/paging'
 
 interface Viewport {
   scrollTop: number
@@ -10,6 +10,7 @@ interface Viewport {
   clientHeight: number
   clientWidth: number
   scrollHeight: number
+  scrollWidth: number
   scrollTo: ReturnType<typeof vi.fn>
   scrollBy: ReturnType<typeof vi.fn>
   querySelector: () => unknown
@@ -23,6 +24,7 @@ function viewport(state: Partial<Viewport> = {}, surface?: { x: number; y: numbe
     clientHeight: 1000,
     clientWidth: 1000,
     scrollHeight: 5000,
+    scrollWidth: 8000,
     scrollTo: vi.fn(),
     scrollBy: vi.fn(),
     querySelector: () =>
@@ -106,5 +108,30 @@ describe('firstVisibleBar', () => {
   it('counts a bar a few pixels above the fold as visible', () => {
     expect(firstVisibleBar(bars, 403)).toBe(2)
     expect(firstVisibleBar(bars, 405)).toBe(0)
+  })
+})
+
+describe('scrollToEdge', () => {
+  it('scrolls to the top for the start', () => {
+    const vp = viewport({ scrollTop: 2000 })
+    scrollToEdge(asElement(vp), 'start')
+    expect(scrolledTo(vp)).toBe(0)
+  })
+
+  it('scrolls as far as the content goes for the end, and nowhere when it all fits', () => {
+    const vp = viewport()
+    scrollToEdge(asElement(vp), 'end')
+    expect(scrolledTo(vp)).toBe(4000)
+    const short = viewport({ scrollHeight: 600 })
+    scrollToEdge(asElement(short), 'end')
+    expect(scrolledTo(short)).toBe(0)
+  })
+
+  it('scrolls sideways in the horizontal layout', () => {
+    const vp = viewport({ scrollTop: 300, scrollLeft: 2000 })
+    scrollToEdge(asElement(vp), 'end', true)
+    expect(vp.scrollTo).toHaveBeenCalledWith({ left: 7000, behavior: 'smooth' })
+    scrollToEdge(asElement(vp), 'start', true)
+    expect(vp.scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: 'smooth' })
   })
 })

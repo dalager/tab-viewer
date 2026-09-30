@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import type { ScoreTrack } from '@/score/tracks'
+import { describeSelection, type ScoreTrack, toggleTrack } from '@/score/tracks'
 
 interface TrackPickerProps {
   tracks: ScoreTrack[]
@@ -39,31 +39,6 @@ function MuteButton({ track, muted, onToggle }: { track: ScoreTrack; muted: bool
   )
 }
 
-/** How many tracks are shown, and the label saying so. */
-function describeSelection(tracks: ScoreTrack[], selected: Set<number>) {
-  const isAll = selected.size === 0 || selected.size === tracks.length
-  const activeCount = selected.size === 0 ? tracks.length : selected.size
-  const plural = tracks.length === 1 ? '' : 's'
-  const label =
-    tracks.length === 0
-      ? 'No tracks'
-      : isAll
-        ? `All ${tracks.length} track${plural}`
-        : `${activeCount} of ${tracks.length} tracks`
-  // The count shows only when some tracks are hidden, like speed off 100%.
-  const count = isAll ? null : `${activeCount}/${tracks.length}`
-  return { count, label }
-}
-
-/** The selection with one track flipped, or null if that would hide every track. */
-function toggled(tracks: ScoreTrack[], selected: Set<number>, index: number): Set<number> | null {
-  // An empty set means "all", so materialise it before removing anything.
-  const next = selected.size === 0 ? new Set(tracks.map((t) => t.index)) : new Set(selected)
-  if (next.has(index)) next.delete(index)
-  else next.add(index)
-  return next.size === 0 ? null : next
-}
-
 export function TrackPicker({
   tracks,
   selected,
@@ -77,7 +52,7 @@ export function TrackPicker({
   const caption = tile ? (count ?? 'Tracks') : count
 
   function toggle(index: number) {
-    const next = toggled(tracks, selected, index)
+    const next = toggleTrack(tracks, selected, index)
     if (next) onChange(next)
   }
 

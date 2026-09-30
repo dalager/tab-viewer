@@ -1,7 +1,7 @@
 // The app on a phone: a toolbar that fits, the list as a drawer over the
 // score, and the controls left out of the toolbar gathered in its menu.
 
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 import {
   BOOK_NAME,
   expectOpenPiece,
@@ -61,6 +61,10 @@ test('the menu holds the controls the toolbar leaves out', async ({ page }) => {
   }
 
   // Toggles leave the menu open.
+  await menu.getByRole('button', { name: 'Zoom in' }).click()
+  await expect(menu.getByRole('button', { name: 'Reset zoom' })).toHaveText(/110%/)
+  await menu.getByRole('button', { name: 'Zoom out' }).click()
+  await expect(menu.getByRole('button', { name: 'Reset zoom' })).toHaveText(/100%/)
   await menu.getByRole('button', { name: 'Layout: Page' }).click()
   await expect(menu.getByRole('button', { name: 'Layout: Horizontal' })).toBeVisible()
 
@@ -75,4 +79,25 @@ test('the track list opens from the menu', async ({ page }) => {
   const menu = await openMenu(page)
   await menu.getByRole('button', { name: /^Tracks:/ }).click()
   await expect(page.getByRole('button', { name: 'First only' })).toBeVisible()
+})
+
+test('the menu shows a copied link, full screen, and no songbook', async ({ page }) => {
+  await openOnPhone(page)
+  let menu = await openMenu(page)
+  await menu.getByRole('button', { name: 'Copy link to this bar' }).click()
+  // Copying leaves the menu open, so the confirmation shows there.
+  await expect(menu.getByRole('button', { name: 'Link copied' })).toBeVisible()
+
+  await menu.getByRole('button', { name: 'Full screen' }).click()
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
+  menu = await openMenu(page)
+  await menu.getByRole('button', { name: 'Exit full screen' }).click()
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(false)
+
+  menu = await openMenu(page)
+  await menu.getByRole('button', { name: new RegExp(BOOK_NAME) }).click()
+  await page.getByRole('dialog', { name: 'Songbooks' }).getByRole('button', { name: 'Unload' }).click()
+  await page.keyboard.press('Escape')
+  menu = await openMenu(page)
+  await expect(menu.getByRole('button', { name: 'Load a songbook' })).toBeVisible()
 })

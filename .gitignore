@@ -41,3 +41,7 @@ playwright-report
 .claude/
 .mcp.json
 CLAUDE.md
+
+# Coverage (npm run test:coverage)
+coverage
+dist-coverage

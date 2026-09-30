@@ -1,6 +1,6 @@
 // First visit, moving between pieces, and what the app remembers.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import {
   BOOK_NAME,
   BOOK_URL,

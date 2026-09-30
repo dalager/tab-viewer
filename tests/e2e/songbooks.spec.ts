@@ -1,6 +1,6 @@
 // Loading, unloading, forgetting and downloading songbooks.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import {
   BOOK_NAME,
   BOOK_URL,

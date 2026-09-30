@@ -1,13 +1,13 @@
-import { type RefObject, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 /**
- * Fullscreen for a specific element (the app shell, not document.body) so the
- * sidebar can be hidden while fullscreen.
+ * Full screen for the whole page. Not just the app shell: dialogs and popovers
+ * are portalled to <body>, outside the shell, and would be hidden behind it.
  *
  * Listens to fullscreenchange so state stays correct when the user leaves via
  * the browser's own Escape or F11 rather than our `f` key.
  */
-export function useFullscreen(targetRef: RefObject<HTMLElement | null>) {
+export function useFullscreen() {
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   useEffect(() => {
@@ -17,14 +17,13 @@ export function useFullscreen(targetRef: RefObject<HTMLElement | null>) {
   }, [])
 
   const enter = useCallback(async () => {
-    const el = targetRef.current
-    if (!el || document.fullscreenElement) return
+    if (document.fullscreenElement) return
     try {
-      await el.requestFullscreen()
+      await document.documentElement.requestFullscreen()
     } catch {
       // Denied or unsupported: stay windowed.
     }
-  }, [targetRef])
+  }, [])
 
   const exit = useCallback(async () => {
     if (!document.fullscreenElement) return

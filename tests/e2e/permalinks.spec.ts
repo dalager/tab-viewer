@@ -1,6 +1,6 @@
 // Links to pieces and bars, and the address bar as a permalink.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import {
   BOOK_URL,
   expectOpenPiece,

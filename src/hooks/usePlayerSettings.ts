@@ -1,6 +1,7 @@
 import type * as alphaTab from '@coderline/alphatab'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MAX_SPEED, MIN_SPEED, NYLON_GUITAR_PROGRAM } from '@/score/settings'
+import { applyPrograms } from '@/score/programs'
+import { MAX_SPEED, MIN_SPEED } from '@/score/settings'
 
 export interface PlayerSettings {
   metronome: boolean
@@ -13,26 +14,6 @@ export interface PlayerSettings {
   /** Play every non-percussion track on nylon guitar, ignoring the file's own instruments. */
   guitarOnly: boolean
   toggleGuitarOnly: () => void
-}
-
-/**
- * Point every pitched track at nylon guitar, or restore what the file asked for.
- * Percussion is left alone: its "program" is a kit, not an instrument.
- */
-function applyPrograms(
-  score: alphaTab.model.Score,
-  force: boolean,
-  originals?: Map<number, number>,
-): void {
-  for (const track of score.tracks) {
-    if (track.isPercussion) continue
-    if (force) {
-      track.playbackInfo.program = NYLON_GUITAR_PROGRAM
-    } else {
-      const original = originals?.get(track.index)
-      if (original !== undefined) track.playbackInfo.program = original
-    }
-  }
 }
 
 /**

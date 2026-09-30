@@ -44,6 +44,19 @@ export const title = (page: Page) => toolbar(page).getByRole('heading', { level:
 export const sidebarRow = (page: Page, name: string): Locator =>
   sidebar(page).getByRole('button', { name, exact: true })
 
+/**
+ * Puts these localStorage entries in place before the app's first load only,
+ * as a browser that used the app before would have them; a reload sees what
+ * the app itself stored since.
+ */
+export async function seedStorage(page: Page, entries: Record<string, string>) {
+  await page.addInitScript((entries) => {
+    if (sessionStorage.getItem('seeded')) return
+    sessionStorage.setItem('seeded', '1')
+    for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value)
+  }, entries)
+}
+
 /** Waits until alphaTab has painted the open piece's score. */
 export async function expectScoreRendered(page: Page) {
   await expect(page.locator('.at-canvas svg').first()).toBeVisible({ timeout: 45_000 })

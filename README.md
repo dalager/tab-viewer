@@ -256,4 +256,16 @@ npm run preview   # serve the production build locally
 npm run lint      # oxlint, including a complexity limit
 npm test          # vitest: unit tests, and the songbook schema checks
 npm run test:e2e  # Playwright: builds the app and drives it in Chromium
+npm run test:coverage  # both, measuring coverage of src/, and one merged report
 ```
+
+`npm run test:coverage` runs the unit tests with coverage, then the
+end-to-end tests against a build instrumented the same way (in
+`dist-coverage/`), and merges the two. It prints the unit, end-to-end and
+combined totals and writes an HTML report to `coverage/report/index.html`
+(plus lcov and a JSON summary). The parts run on their own as
+`coverage:unit`, `coverage:e2e` and `coverage:report`. Generated shadcn
+components in `src/components/ui/` are not measured. The browser build's
+counts are mapped back to the TypeScript sources through its source maps, so
+both suites count the same statements; the report says if any could not be
+placed (they then count as uncovered).

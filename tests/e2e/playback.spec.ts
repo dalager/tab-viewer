@@ -1,7 +1,7 @@
 // Playback controls. The synthesizer runs in an AudioWorklet, which headless
 // Chromium provides without a sound device.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { openApp, toolbar } from './helpers'
 
 test('Space plays and pauses, s stops, m toggles the metronome', async ({ page }) => {

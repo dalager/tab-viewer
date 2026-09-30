@@ -9,7 +9,12 @@ import {
   MAX_SCALE,
   MIN_SCALE,
 } from '@/score/settings'
-import { type ScoreTrack, toScoreTrack } from '@/score/tracks'
+import {
+  firstOnlyToggled,
+  type ScoreTrack,
+  toScoreTrack,
+  tracksToRender,
+} from '@/score/tracks'
 
 export interface ScoreDisplay {
   /** Zoom, 1.0 being alphaTab's default size. */
@@ -72,19 +77,6 @@ function useDisplaySettings(api: alphaTab.AlphaTabApi | null) {
   return { scale, zoomBy, resetZoom, layout, cycleLayout }
 }
 
-/** The tracks alphaTab should render, `indexes` empty meaning all of them. */
-function tracksToRender(score: alphaTab.model.Score, indexes: Set<number>): alphaTab.model.Track[] {
-  return indexes.size === 0 ? score.tracks : score.tracks.filter((t) => indexes.has(t.index))
-}
-
-/** Every track if only the first is shown, else only the first; null without tracks. */
-function firstOnlyToggled(tracks: ScoreTrack[], selected: Set<number>): Set<number> | null {
-  if (tracks.length === 0) return null
-  const first = tracks[0].index
-  const firstOnly = selected.size === 1 && selected.has(first)
-  return firstOnly ? new Set() : new Set([first])
-}
-
 /** Which tracks are rendered; a new score starts with all of them. */
 function useTrackSelection(api: alphaTab.AlphaTabApi | null, score: alphaTab.model.Score | null) {
   const [selectedTracks, setSelected] = useState<Set<number>>(new Set())
@@ -144,9 +136,9 @@ function useScrolling(
 
   const toEdge = useCallback(
     (edge: 'start' | 'end') => {
-      if (viewportRef.current) scrollToEdge(viewportRef.current, edge)
+      if (viewportRef.current) scrollToEdge(viewportRef.current, edge, horizontal)
     },
-    [viewportRef],
+    [viewportRef, horizontal],
   )
 
   const topVisibleBar = useCallback(() => {

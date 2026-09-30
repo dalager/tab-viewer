@@ -10,7 +10,7 @@ import type * as alphaTab from '@coderline/alphatab'
 import type { BarStart } from '@/score/paging'
 
 /** Offset of `el` within the scrolling `container`, along one axis. */
-function offsetWithin(el: HTMLElement, container: HTMLElement, axis: 'x' | 'y' = 'y'): number {
+function offsetWithin(el: HTMLElement, container: HTMLElement, axis: 'x' | 'y'): number {
   let offset = 0
   let node: HTMLElement | null = el
   while (node && node !== container) {

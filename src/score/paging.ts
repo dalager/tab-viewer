@@ -58,11 +58,13 @@ export function pageBy(
   viewport.scrollTo({ top: clamp(target, 0, maxScroll), behavior: 'smooth' })
 }
 
-export function scrollToEdge(viewport: HTMLElement, edge: 'start' | 'end'): void {
-  viewport.scrollTo({
-    top: edge === 'start' ? 0 : Math.max(0, viewport.scrollHeight - viewport.clientHeight),
-    behavior: 'smooth',
-  })
+/** Scrolls to the start or end of the score: sideways in the horizontal layout. */
+export function scrollToEdge(viewport: HTMLElement, edge: 'start' | 'end', horizontal = false): void {
+  const room = horizontal
+    ? viewport.scrollWidth - viewport.clientWidth
+    : viewport.scrollHeight - viewport.clientHeight
+  const offset = edge === 'start' ? 0 : Math.max(0, room)
+  viewport.scrollTo({ [horizontal ? 'left' : 'top']: offset, behavior: 'smooth' })
 }
 
 /** Slack so a bar sitting right at the fold still counts as visible. */

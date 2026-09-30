@@ -1,7 +1,8 @@
 // Playback ranges come from alphaTab in ticks; the toolbar shows them as bars.
 
+import type * as alphaTab from '@coderline/alphatab'
 import { describe, expect, it } from 'vitest'
-import { barAt, barRangeOf } from '@/score/range'
+import { barAt, barRangeOf, barStartTicks } from '@/score/range'
 
 // Three 4/4 bars at alphaTab's 960 ticks per quarter note.
 const STARTS = [0, 3840, 7680]
@@ -27,5 +28,20 @@ describe('barRangeOf', () => {
 
   it('is null without a range', () => {
     expect(barRangeOf(STARTS, null)).toBeNull()
+  })
+})
+
+describe('barStartTicks', () => {
+  const masterBars = [{ start: 0 }, { start: 3840 }] as alphaTab.model.MasterBar[]
+
+  it("reads each bar's start from the tick cache when there is one", () => {
+    const tickCache = { getMasterBarStart: (bar: { start: number }) => bar.start + 1 }
+    const api = { score: { masterBars }, tickCache } as unknown as alphaTab.AlphaTabApi
+    expect(barStartTicks(api)).toEqual([1, 3841])
+  })
+
+  it("falls back to the bars' own starts, and to no bars without a score", () => {
+    expect(barStartTicks({ score: { masterBars }, tickCache: null } as unknown as alphaTab.AlphaTabApi)).toEqual([0, 3840])
+    expect(barStartTicks({ score: null, tickCache: null } as unknown as alphaTab.AlphaTabApi)).toEqual([])
   })
 })

@@ -14,7 +14,11 @@
     "prebuild": "npm run songbooks && npm run soundfont",
     "soundfont": "node scripts/fetch-soundfont.mjs",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:coverage": "npm run coverage:unit && npm run coverage:e2e && npm run coverage:report",
+    "coverage:unit": "vitest run --coverage",
+    "coverage:e2e": "node -e \"fs.rmSync('coverage/e2e', { recursive: true, force: true })\" && E2E_COVERAGE=1 playwright test",
+    "coverage:report": "node scripts/coverage-report.mjs"
   },
   "dependencies": {
     "@coderline/alphatab": "^1.8.4",
@@ -34,16 +38,24 @@
   },
   "devDependencies": {
     "@coderline/alphatab-vite": "^1.8.4",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@playwright/test": "^1.63.0",
+    "@types/istanbul-lib-coverage": "^2.0.6",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-istanbul": "^4.1.11",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
+    "istanbul-lib-coverage": "^3.2.2",
+    "istanbul-lib-report": "^3.0.1",
+    "istanbul-lib-source-maps": "^5.0.6",
+    "istanbul-reports": "^3.2.0",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
+    "vite-plugin-istanbul": "^9.0.1",
     "vitest": "^4.1.11"
   }
 }

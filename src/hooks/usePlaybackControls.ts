@@ -1,6 +1,7 @@
 import type * as alphaTab from '@coderline/alphatab'
 import { useCallback, useEffect, useState } from 'react'
-import { type BarRange, barRangeOf } from '@/score/range'
+import { type BarRange, barRangeOf, barStartTicks } from '@/score/range'
+import { toggledIndex } from '@/score/tracks'
 
 export interface PlaybackControls {
   /** Indexes of the tracks that are silent, so the reader can play them instead. */
@@ -12,21 +13,6 @@ export interface PlaybackControls {
   /** The bars a selection in the score limits playback to, or null for the whole piece. */
   selection: BarRange | null
   clearSelection: () => void
-}
-
-/** A copy of the set with `index` added, or removed if it was there. */
-function toggled(indexes: Set<number>, index: number): Set<number> {
-  const next = new Set(indexes)
-  if (next.has(index)) next.delete(index)
-  else next.add(index)
-  return next
-}
-
-/** Where each master bar starts in playback ticks, in order. */
-function barStartTicks(api: alphaTab.AlphaTabApi): number[] {
-  const bars = api.score?.masterBars ?? []
-  const ticks = api.tickCache
-  return bars.map((bar) => (ticks ? ticks.getMasterBarStart(bar) : bar.start))
 }
 
 /** Plays the whole piece again and removes the selection markers. */
@@ -60,7 +46,7 @@ function useTrackMute(api: alphaTab.AlphaTabApi | null, score: alphaTab.model.Sc
     (index: number) => {
       const track = score?.tracks.find((t) => t.index === index)
       if (!api || !track) return
-      const next = toggled(mutedTracks, index)
+      const next = toggledIndex(mutedTracks, index)
       api.changeTrackMute([track], next.has(index))
       setMuted(next)
     },

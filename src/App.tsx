@@ -160,7 +160,6 @@ function shortcutActions(ctx: ShortcutContext): ShortcutActions {
 }
 
 export default function App() {
-  const shellRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -182,7 +181,7 @@ export default function App() {
   const settled = imports.ready && songbooks.status !== 'loading'
 
   const score = useAlphaTab(canvasRef, viewportRef)
-  const fullscreen = useFullscreen(shellRef)
+  const fullscreen = useFullscreen()
 
   const selection = usePieceSelection({
     startLink,
@@ -232,7 +231,6 @@ export default function App() {
 
   return (
     <div
-      ref={shellRef}
       className="relative flex h-dvh w-screen flex-col overflow-hidden bg-white"
       {...drop.handlers}
     >

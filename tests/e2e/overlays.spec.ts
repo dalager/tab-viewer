@@ -1,6 +1,6 @@
 // The search palette, the help overlay and the view controls in the toolbar.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectOpenPiece, openApp, PIECES, pieceUrl, toolbar } from './helpers'
 
 const [ARPEGGIOS, CELLO, PARTITA] = PIECES

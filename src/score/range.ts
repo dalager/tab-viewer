@@ -1,7 +1,9 @@
 /**
  * Playback ranges, which alphaTab keeps in ticks, as the bars a reader sees.
- * Pure math over each bar's start tick; the score hooks supply those.
+ * Pure math over each bar's start tick, read from the score by barStartTicks.
  */
+
+import type * as alphaTab from '@coderline/alphatab'
 
 /** Bars (0-based, both ends included) a selection covers. */
 export interface BarRange {
@@ -23,4 +25,11 @@ export function barRangeOf(
 ): BarRange | null {
   if (!range) return null
   return { first: barAt(starts, range.startTick), last: barAt(starts, range.endTick) }
+}
+
+/** Where each master bar starts in playback ticks, in order; none without a score. */
+export function barStartTicks(api: Pick<alphaTab.AlphaTabApi, 'score' | 'tickCache'>): number[] {
+  const bars = api.score?.masterBars ?? []
+  const ticks = api.tickCache
+  return bars.map((bar) => (ticks ? ticks.getMasterBarStart(bar) : bar.start))
 }

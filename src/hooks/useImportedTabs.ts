@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   deleteImported,
+  importedRecord,
+  importExtension,
   type ImportedRecord,
   listImported,
   putImported,
-  IMPORTED_ID_PREFIX,
 } from '@/lib/importedTabs'
 import { IMPORTED_BOOK } from '@/lib/pieces'
 import { errorMessage } from '@/lib/utils'
 import { readScoreMetadata } from '@/score/metadata'
 import type { TabEntry } from '@/types'
 
-/** Formats alphaTab can open. gp3-5 are binary, gpx/gp are zipped XML. */
-export const IMPORT_EXTENSIONS = ['gp3', 'gp4', 'gp5', 'gpx', 'gp']
-export const IMPORT_ACCEPT = IMPORT_EXTENSIONS.map((e) => `.${e}`).join(',')
+export { IMPORT_ACCEPT, IMPORT_EXTENSIONS } from '@/lib/importedTabs'
 
 
 export interface UseImportedTabs {
@@ -40,23 +39,8 @@ function toEntry(record: ImportedRecord): TabEntry {
   }
 }
 
-function newId(): string {
-  const uuid =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  return `${IMPORTED_ID_PREFIX}${uuid}`
-}
-
-function stem(name: string): string {
-  return name.replace(/\.[^.]+$/, '')
-}
-
 async function toRecord(file: File): Promise<ImportedRecord> {
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-  if (!IMPORT_EXTENSIONS.includes(ext)) {
-    throw new Error(`${file.name}: not a Guitar Pro file (${IMPORT_ACCEPT})`)
-  }
+  const ext = importExtension(file.name)
   const bytes = await file.arrayBuffer()
   let meta: { title: string; artist: string }
   try {
@@ -65,14 +49,7 @@ async function toRecord(file: File): Promise<ImportedRecord> {
     const reason = errorMessage(e)
     throw new Error(`${file.name}: could not be read (${reason})`)
   }
-  return {
-    id: newId(),
-    title: meta.title || stem(file.name),
-    artist: meta.artist || 'Imported',
-    ext,
-    addedAt: Date.now(),
-    bytes,
-  }
+  return importedRecord({ name: file.name, ext, bytes }, meta)
 }
 
 /** Stores each file, collecting the entries added and a message per failure. */

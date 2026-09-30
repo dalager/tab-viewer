@@ -2,7 +2,7 @@
 // at 120 bpm (two seconds each), a lick on the "Guitar" track and chords on
 // "Rhythm".
 
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures'
 import { expectOpenPiece, openApp, PIECES, title, toolbar } from './helpers'
 
 const LICK = PIECES[3]

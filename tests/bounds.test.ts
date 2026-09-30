@@ -68,6 +68,10 @@ describe('computeSystemTops', () => {
     )
     expect(tops).toEqual([50, 350, 650])
   })
+
+  it('takes the surface to start at the top before alphaTab has rendered one', () => {
+    expect(computeSystemTops(api([{ y: 300 }, { y: 0 }]), asElement(viewport()))).toEqual([0, 300])
+  })
 })
 
 describe('barStarts', () => {

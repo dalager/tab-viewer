@@ -10,6 +10,20 @@ import { defineConfig, devices } from '@playwright/test'
 // .github/workflows/deploy.yml), so the tests serve that build as it is.
 const CI = !!process.env.CI
 
+// `npm run coverage:e2e` sets E2E_COVERAGE: the app is then built
+// instrumented into its own folder and served on its own port, so a plain
+// build or a running preview is never mistaken for it (see fixtures.ts).
+const COVERAGE = !!process.env.E2E_COVERAGE
+const PORT = COVERAGE ? 4175 : 4173
+const BASE_URL = `http://localhost:${PORT}`
+
+function serverCommand(): string {
+  if (COVERAGE) {
+    return `npm run prebuild && vite build --outDir dist-coverage && vite preview --outDir dist-coverage --port ${PORT} --strictPort`
+  }
+  return `${CI ? '' : 'npm run build && '}npm run preview -- --port ${PORT} --strictPort`
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -21,15 +35,15 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: BASE_URL,
     trace: 'retain-on-failure',
     permissions: ['clipboard-read', 'clipboard-write'],
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `${CI ? '' : 'npm run build && '}npm run preview -- --port 4173 --strictPort`,
-    url: 'http://localhost:4173',
-    reuseExistingServer: !CI,
+    command: serverCommand(),
+    url: BASE_URL,
+    reuseExistingServer: !CI && !COVERAGE,
     timeout: 300_000,
   },
 })
