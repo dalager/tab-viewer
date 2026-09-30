@@ -20,7 +20,7 @@ test('o shows the loaded songbook, and Unload empties the app', async ({ page })
   await page.keyboard.press('o')
   const dialog = page.getByRole('dialog', { name: 'Songbooks' })
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByText(`3 pieces · ${new URL(BOOK_URL, page.url()).href}`)).toBeVisible()
+  await expect(dialog.getByText(`4 pieces · ${new URL(BOOK_URL, page.url()).href}`)).toBeVisible()
 
   await dialog.getByRole('button', { name: 'Unload' }).click()
   await page.keyboard.press('Escape')
@@ -60,7 +60,7 @@ test('a forgotten book returns to the suggestions and can be loaded by URL', asy
   await dialog.getByRole('button', { name: 'Load' }).click()
   await expect(dialog).toHaveCount(0)
   await expectOpenPiece(page, ARPEGGIOS)
-  await expect(sidebar(page).getByText('3 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
 })
 
 test('Download packs the loaded book into a .sbk with the same pieces', async ({ page }, testInfo) => {
@@ -70,7 +70,7 @@ test('Download packs the loaded book into a .sbk with the same pieces', async ({
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: 'Download' }).click()
   const file = await download
-  expect(file.suggestedFilename()).toBe('bach-guitar-songbook.sbk')
+  expect(file.suggestedFilename()).toBe('starter-pieces.sbk')
 
   const saved = testInfo.outputPath(file.suggestedFilename())
   await file.saveAs(saved)

@@ -14,11 +14,11 @@ import {
   toolbar,
 } from './helpers'
 
-const [ARPEGGIOS, CELLO, PARTITA] = PIECES
+const [ARPEGGIOS, CELLO, PARTITA, LICK] = PIECES
 
 test('a first visit opens the bundled songbook on its first piece', async ({ page }) => {
   await openApp(page)
-  await expect(sidebar(page).getByText(`3 of 3`)).toBeVisible()
+  await expect(sidebar(page).getByText(`4 of 4`)).toBeVisible()
   for (const piece of PIECES) await expect(sidebarRow(page, piece.title)).toBeVisible()
   await expectOpenPiece(page, ARPEGGIOS)
   await expect(page.getByText('Bach · GP5')).toBeVisible()
@@ -46,13 +46,15 @@ test('n and p step through the pieces and wrap around', async ({ page }) => {
   await page.keyboard.press('n')
   await expectOpenPiece(page, PARTITA)
   await page.keyboard.press('n')
+  await expectOpenPiece(page, LICK)
+  await page.keyboard.press('n')
   await expectOpenPiece(page, ARPEGGIOS)
   await page.keyboard.press('p')
-  await expectOpenPiece(page, PARTITA)
+  await expectOpenPiece(page, LICK)
   await page.keyboard.press(']')
   await expectOpenPiece(page, ARPEGGIOS)
   await page.keyboard.press('[')
-  await expectOpenPiece(page, PARTITA)
+  await expectOpenPiece(page, LICK)
 })
 
 test('the last open piece is reopened on the next visit', async ({ page }) => {
@@ -72,16 +74,16 @@ test('the sidebar filter narrows the list and reports the count', async ({ page 
   await openApp(page)
   const filter = sidebar(page).getByRole('textbox', { name: 'Filter pieces' })
   await filter.fill('cello')
-  await expect(sidebar(page).getByText('1 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('1 of 4')).toBeVisible()
   await expect(sidebarRow(page, CELLO.title)).toBeVisible()
   await expect(sidebarRow(page, ARPEGGIOS.title)).toHaveCount(0)
 
   await filter.fill('no such piece')
-  await expect(sidebar(page).getByText('0 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('0 of 4')).toBeVisible()
   await expect(sidebar(page).getByText('No matches')).toBeVisible()
 
   await filter.fill('')
-  await expect(sidebar(page).getByText('3 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
 })
 
 test('starring a piece repeats it in a Starred section that survives a reload', async ({ page }) => {
@@ -122,7 +124,7 @@ test('a star belongs to its book, not to every piece with the same id', async ({
   // come from the titles, so the copy's piece has the same id as the original.
   await page.keyboard.press('e')
   const dialog = page.getByRole('dialog', { name: 'Export songbook' })
-  await expect(dialog.getByText('1 of 3 selected')).toBeVisible()
+  await expect(dialog.getByText('1 of 4 selected')).toBeVisible()
   await dialog.getByRole('textbox', { name: 'Songbook name' }).fill('Bach copy')
   await dialog.getByRole('button', { name: 'Save & open' }).click()
   await expect(toolbar(page).getByRole('button', { name: 'Bach copy', exact: true })).toBeVisible()

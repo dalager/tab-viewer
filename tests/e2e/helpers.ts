@@ -8,13 +8,14 @@ import { unzipSync } from 'fflate'
 import { expect, type Locator, type Page } from '@playwright/test'
 
 export const BOOK_URL = '/songbooks/bach-for-guitar.sbk'
-export const BOOK_NAME = 'Bach Guitar Songbook'
+export const BOOK_NAME = 'Starter pieces'
 
 /** The bundled book's pieces, in sidebar order (see songbooks/bach-for-guitar.sbk). */
 export const PIECES = [
   { id: 'arpeggios', title: 'Arpeggios' },
   { id: 'cello-prelude-1-in-b-major', title: 'Cello Prelude 1 In B Major' },
   { id: 'partita-no-3-in-e-major-s-1006-preludio', title: 'Partita No 3 In E Major S 1006 Preludio' },
+  { id: 'my-jazz-lick', title: 'My Jazz Lick' },
 ] as const
 
 export const SBK_PATH = path.resolve(import.meta.dirname, '../../songbooks/bach-for-guitar.sbk')

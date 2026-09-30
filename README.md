@@ -68,7 +68,7 @@ ignore. A format that older readers would misread gets a new schema file and a
 new `songbook` number. `npm test` checks every bundled `.sbk` and the exporter's
 output against the schema, and CI runs it on every push.
 
-A first visit opens the bundled *Bach Guitar Songbook*. After that the app
+A first visit opens the bundled *Starter pieces* songbook. After that the app
 opens whatever book was loaded last, or nothing if it was unloaded. Press `o`
 or click *Songbook* in the toolbar to paste a URL, open a `.sbk` file, or pick
 the bundled book again. One songbook is loaded at a time; the loaded one and
@@ -101,11 +101,12 @@ after their titles inside the file, so imports get readable ids.
 
 ## The bundled songbook
 
-The Bach collection lives in the repo as a single file,
-`songbooks/bach-for-guitar.sbk`: 3 Guitar Pro files (`.gp3` / `.gp4` /
-`.gp5`) and their `songbook.json`. `npm run songbooks` publishes it, and
-`SUGGESTED_SONGBOOKS` in `src/lib/songbook.ts` offers it (and opens it on a
-first visit). Any `.sbk` dropped into `songbooks/` is published the same way.
+*Starter pieces* lives in the repo as a single file,
+`songbooks/bach-for-guitar.sbk`: three Bach pieces and a short jazz lick as
+Guitar Pro files, and their `songbook.json`. The file keeps the name from when
+it held only Bach, because links and favourites refer to the book by its URL.
+`npm run songbooks` publishes it, and `SUGGESTED_SONGBOOKS` in
+`src/lib/songbook.ts` offers it (and opens it on a first visit). Any `.sbk` dropped into `songbooks/` is published the same way.
 
 To change the book, open it in the app, adjust it and export a new `.sbk`, or
 edit it by hand:
@@ -124,7 +125,7 @@ repeated ids.
 
 ### About the transcriptions
 
-The Guitar Pro files in the bundled book are community transcriptions gathered
+The Bach pieces in the bundled book are community transcriptions gathered
 from public tab sites. J. S. Bach's compositions are in the public domain, but
 a transcription or arrangement can belong to whoever made it. The files are
 included for personal study and are **not** covered by this project's MIT
@@ -170,11 +171,9 @@ Favourites and the last-opened piece are stored in the browser's `localStorage`.
 Mutes and the selection belong to the open piece; loop, speed and the nylon
 guitar setting carry over to the next one.
 
-To try it, import `songbooks/MyJazzLick.gp5` (press `i`, or drop the file on
-the app): three bars with the lick on a *Guitar* track and the chords on a
-*Rhythm* track. Mute *Guitar* and play the lick over the chords. The file is
-also what the end-to-end tests practise on; the app itself only publishes the
-`.sbk` files in `songbooks/`.
+To try it, open *My Jazz Lick* in the bundled book: three bars with the lick
+on a *Guitar* track and the chords on a *Rhythm* track. Mute *Guitar* and play
+the lick over the chords. It is also what the end-to-end tests practise on.
 
 ### Links to pieces and bars
 

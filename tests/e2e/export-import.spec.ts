@@ -24,17 +24,17 @@ test('e exports the selected pieces as a downloadable .sbk', async ({ page }, te
   await expect(dialog.getByRole('textbox', { name: 'Songbook name' })).toHaveValue(
     `${BOOK_NAME} (selection)`,
   )
-  await expect(dialog.getByText('0 of 3 selected')).toBeVisible()
+  await expect(dialog.getByText('0 of 4 selected')).toBeVisible()
   const submit = dialog.getByRole('button', { name: 'Download .sbk' })
   await expect(submit).toBeDisabled()
 
   await dialog.getByRole('button', { name: 'All', exact: true }).click()
-  await expect(dialog.getByText('3 of 3 selected')).toBeVisible()
+  await expect(dialog.getByText('4 of 4 selected')).toBeVisible()
   await dialog.getByRole('button', { name: 'None', exact: true }).click()
-  await expect(dialog.getByText('0 of 3 selected')).toBeVisible()
+  await expect(dialog.getByText('0 of 4 selected')).toBeVisible()
   await dialog.getByRole('checkbox').nth(1).click()
   await dialog.getByRole('checkbox').nth(2).click()
-  await expect(dialog.getByText('2 of 3 selected')).toBeVisible()
+  await expect(dialog.getByText('2 of 4 selected')).toBeVisible()
 
   await dialog.getByRole('textbox', { name: 'Songbook name' }).fill('Two Preludes')
   await dialog.getByRole('textbox', { name: 'Description' }).fill('Picked in a test')
@@ -59,7 +59,7 @@ test('Save & open keeps the export in this browser and switches to it', async ({
   const dialog = page.getByRole('dialog', { name: 'Export songbook' })
   await dialog.getByRole('textbox', { name: 'Filter pieces to export' }).fill('cello')
   await dialog.getByRole('button', { name: 'All', exact: true }).click()
-  await expect(dialog.getByText('1 of 3 selected')).toBeVisible()
+  await expect(dialog.getByText('1 of 4 selected')).toBeVisible()
   await dialog.getByRole('textbox', { name: 'Songbook name' }).fill('Cello only')
   await dialog.getByRole('button', { name: 'Save & open' }).click()
   await expect(dialog).toHaveCount(0)
@@ -83,7 +83,7 @@ test('Save & open keeps the export in this browser and switches to it', async ({
   await books.getByRole('button', { name: new RegExp(`^${BOOK_NAME}`) }).click()
   // The bundled book has the open piece too, so it stays open rather than jumping.
   await expectOpenPiece(page, CELLO)
-  await expect(sidebar(page).getByText('3 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
 })
 
 test('importing a Guitar Pro file lists it under Imported until it is removed', async ({ page }) => {
@@ -98,7 +98,7 @@ test('importing a Guitar Pro file lists it under Imported until it is removed', 
 
   await expect(sidebar(page).getByRole('heading', { name: 'Imported' })).toBeVisible()
   await expect(sidebar(page).getByRole('heading', { name: BOOK_NAME })).toBeVisible()
-  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
+  await expect(sidebar(page).getByText('5 of 5')).toBeVisible()
   const remove = sidebar(page).getByRole('button', { name: 'Remove imported piece' })
   await expect(remove).toHaveCount(1)
   // The import opens straight away; its file only lives here, so no link.
@@ -107,11 +107,11 @@ test('importing a Guitar Pro file lists it under Imported until it is removed', 
   await expectScoreRendered(page)
 
   await page.reload()
-  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
+  await expect(sidebar(page).getByText('5 of 5')).toBeVisible()
   await expect(page).toHaveURL(/\/p\/imported-/)
 
   await remove.click()
-  await expect(sidebar(page).getByText('3 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
   await expect(sidebar(page).getByRole('heading', { name: 'Imported' })).toHaveCount(0)
   await expectOpenPiece(page, ARPEGGIOS)
 })
@@ -124,7 +124,7 @@ test('a file that is not a tab is refused with a message', async ({ page }) => {
     buffer: Buffer.from('this is not a guitar pro file'),
   })
   await expect(page.getByText(/notes\.gp5: could not be read/)).toBeVisible()
-  await expect(sidebar(page).getByText('3 of 3')).toBeVisible()
+  await expect(sidebar(page).getByText('4 of 4')).toBeVisible()
 })
 
 test('opening a .sbk file loads it as a songbook stored in this browser', async ({ page }) => {
@@ -135,6 +135,6 @@ test('opening a .sbk file loads it as a songbook stored in this browser', async 
   )
   await page.keyboard.press('o')
   const books = page.getByRole('dialog', { name: 'Songbooks' })
-  await expect(books.getByText('3 pieces · Opened from a file, stored in this browser')).toBeVisible()
+  await expect(books.getByText('4 pieces · Opened from a file, stored in this browser')).toBeVisible()
   await expect(books.getByRole('button', { name: new RegExp(`^${BOOK_NAME}`) })).toHaveCount(2)
 })

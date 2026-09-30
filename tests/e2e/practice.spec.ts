@@ -1,16 +1,15 @@
-// Practice controls, on songbooks/MyJazzLick.gp5: three bars of 4/4 at 120
-// bpm (two seconds each), a lick on the "Guitar" track and chords on "Rhythm".
+// Practice controls, on My Jazz Lick in the bundled book: three bars of 4/4
+// at 120 bpm (two seconds each), a lick on the "Guitar" track and chords on
+// "Rhythm".
 
 import { expect, type Page, test } from '@playwright/test'
-import { expectScoreRendered, openApp, toolbar } from './helpers'
+import { expectOpenPiece, openApp, PIECES, title, toolbar } from './helpers'
 
-const LICK = new URL('../../songbooks/MyJazzLick.gp5', import.meta.url).pathname
+const LICK = PIECES[3]
 
 async function openLick(page: Page) {
-  await openApp(page)
-  await page.locator('input[type=file]').setInputFiles(LICK)
-  await expect(toolbar(page).getByRole('heading', { level: 1 })).toHaveText('MyJazzLick')
-  await expectScoreRendered(page)
+  await openApp(page, `/p/${LICK.id}`)
+  await expectOpenPiece(page, LICK)
   await expect(toolbar(page).getByRole('button', { name: 'Play', exact: true })).toBeEnabled({
     timeout: 45_000,
   })
@@ -51,7 +50,7 @@ test('each track can be muted, and a new piece starts with every track playing',
 
   await page.keyboard.press('n')
   await page.keyboard.press('p')
-  await expect(toolbar(page).getByRole('heading', { level: 1 })).toHaveText('MyJazzLick')
+  await expect(title(page)).toHaveText(LICK.title)
   await toolbar(page).getByRole('button', { name: /^Tracks:/ }).click()
   await expect(page.getByRole('button', { name: 'Mute Guitar' })).toHaveAttribute('aria-pressed', 'false')
 })

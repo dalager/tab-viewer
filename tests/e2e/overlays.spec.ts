@@ -62,7 +62,7 @@ test('/ opens the search palette and Enter opens the match', async ({ page }) =>
   await page.keyboard.press('/')
   const palette = page.getByRole('dialog', { name: 'Find a piece' })
   await expect(palette).toBeVisible()
-  await expect(palette.getByText('3 pieces')).toBeVisible()
+  await expect(palette.getByText('4 pieces')).toBeVisible()
 
   await palette.getByPlaceholder('Search pieces…').fill('partita')
   await expect(palette.getByRole('option')).toHaveCount(1)

@@ -36,12 +36,13 @@ export const SONGBOOK_VERSION = 1
 export const SONGBOOK_SCHEMA = 'https://tabviewer.dalagerlabs.com/schema/songbook-1.schema.json'
 
 /**
- * Books offered with one click. The bundled Bach book lives in the repo as
- * songbooks/bach-for-guitar.sbk and is published by scripts/copy-songbooks.mjs;
+ * Books offered with one click. The bundled starter book lives in the repo as
+ * songbooks/bach-for-guitar.sbk (named for what it first held; links and
+ * favourites use the URL, so it keeps it) and is published by scripts/copy-songbooks.mjs;
  * this is the only place the app knows it exists.
  */
 export const SUGGESTED_SONGBOOKS = [
-  { name: 'Bach Guitar Songbook', url: '/songbooks/bach-for-guitar.sbk' },
+  { name: 'Starter pieces', url: '/songbooks/bach-for-guitar.sbk' },
 ]
 
 /** Loaded on a visitor's very first visit, so the app does not open empty. */
