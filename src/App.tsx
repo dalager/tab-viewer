@@ -5,6 +5,7 @@ import { FileDropOverlay } from '@/components/FileDropOverlay'
 import { FilePickerInput } from '@/components/FilePickerInput'
 import { ScoreView } from '@/components/ScoreView'
 import { ShortcutHelp } from '@/components/ShortcutHelp'
+import { SidebarDrawer } from '@/components/SidebarDrawer'
 import { SongbookDialog } from '@/components/SongbookDialog'
 import { TabCommandPalette } from '@/components/TabCommandPalette'
 import { TabSidebar } from '@/components/TabSidebar'
@@ -19,8 +20,10 @@ import { useHotkeys } from '@/hooks/useHotkeys'
 import { useImportedTabs } from '@/hooks/useImportedTabs'
 import { useOverlay } from '@/hooks/useOverlay'
 import { usePieceSelection } from '@/hooks/usePieceSelection'
+import { useSidebar } from '@/hooks/useSidebar'
 import { useSongbooks } from '@/hooks/useSongbooks'
 import { parseLocation } from '@/lib/permalink'
+import type { PieceRef } from '@/lib/pieces'
 import type { Songbook } from '@/lib/songbook'
 import { SPEED_STEP } from '@/score/settings'
 import { SHORTCUTS, type ShortcutActions } from '@/shortcuts'
@@ -83,6 +86,7 @@ function toolbarProps(ctx: ToolbarContext): React.ComponentProps<typeof Toolbar>
     scale: score.scale,
     layout: score.layout,
     isFullscreen: fullscreen.isFullscreen,
+    canFullscreen: fullscreen.supported,
     sidebarOpen: ctx.sidebarOpen,
     isPlayerReady: score.isPlayerReady,
     isPlaying: score.isPlaying,
@@ -160,8 +164,8 @@ export default function App() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const toggleSidebar = () => setSidebarOpen((v) => !v)
+  const sidebar = useSidebar()
+  const toggleSidebar = sidebar.toggle
   const overlay = useOverlay()
 
   const imports = useImportedTabs()
@@ -219,31 +223,39 @@ export default function App() {
 
   const copyLink = () => void link.copy()
   const context = { score, selection, overlay, files, fullscreen, copyLink, toggleSidebar }
+  const pickFromList = (piece: PieceRef) => {
+    select(piece)
+    sidebar.picked()
+  }
   const actions = shortcutActions(context)
   useHotkeys(SHORTCUTS, actions, overlay.isOpen)
 
   return (
     <div
       ref={shellRef}
-      className="relative flex h-screen w-screen flex-col overflow-hidden bg-white"
+      className="relative flex h-dvh w-screen flex-col overflow-hidden bg-white"
       {...drop.handlers}
     >
       <FilePickerInput inputRef={files.inputRef} onFiles={(f) => void files.importAll(f)} />
       {drop.dragging && <FileDropOverlay />}
 
-      <Toolbar {...toolbarProps({ ...context, book, sidebarOpen, linkCopied: link.copied })} />
+      <Toolbar
+        {...toolbarProps({ ...context, book, sidebarOpen: sidebar.open, linkCopied: link.copied })}
+      />
 
       <div className="relative flex min-h-0 flex-1">
-        {sidebarOpen && (
-          <TabSidebar
-            tabs={allTabs}
-            bookNames={bookNames}
-            selectedKey={selection.selectedKey}
-            favorites={favorites}
-            onSelect={select}
-            onRemove={(id) => void imports.removeImported(id)}
-            onExport={overlay.opener('export')}
-          />
+        {sidebar.open && (
+          <SidebarDrawer overlay={sidebar.overlay} onClose={sidebar.close}>
+            <TabSidebar
+              tabs={allTabs}
+              bookNames={bookNames}
+              selectedKey={selection.selectedKey}
+              favorites={favorites}
+              onSelect={pickFromList}
+              onRemove={(id) => void imports.removeImported(id)}
+              onExport={overlay.opener('export')}
+            />
+          </SidebarDrawer>
         )}
         <ScoreView
           viewportRef={viewportRef}

@@ -1,5 +1,6 @@
 import { Layers, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { TILE_CLASS } from '@/components/ToolButton'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
@@ -14,6 +15,8 @@ interface TrackPickerProps {
   /** Indexes of silenced tracks; they still show, but do not play. */
   muted: Set<number>
   onToggleMute: (index: number) => void
+  /** Shown as a captioned tile, for the toolbar menu. */
+  tile?: boolean
 }
 
 function MuteButton({ track, muted, onToggle }: { track: ScoreTrack; muted: boolean; onToggle: () => void }) {
@@ -27,7 +30,7 @@ function MuteButton({ track, muted, onToggle }: { track: ScoreTrack; muted: bool
       aria-pressed={muted}
       title={muted ? `${track.name} is muted: play it yourself` : `Mute ${track.name}`}
       className={cn(
-        'shrink-0 rounded-md p-1.5 transition-colors hover:text-neutral-900',
+        'shrink-0 rounded-md p-1.5 transition-colors hover:text-neutral-900 pointer-coarse:p-2.5',
         muted ? 'text-red-600' : 'text-neutral-400',
       )}
     >
@@ -47,7 +50,9 @@ function describeSelection(tracks: ScoreTrack[], selected: Set<number>) {
       : isAll
         ? `All ${tracks.length} track${plural}`
         : `${activeCount} of ${tracks.length} tracks`
-  return { isAll, activeCount, label }
+  // The count shows only when some tracks are hidden, like speed off 100%.
+  const count = isAll ? null : `${activeCount}/${tracks.length}`
+  return { count, label }
 }
 
 /** The selection with one track flipped, or null if that would hide every track. */
@@ -59,8 +64,17 @@ function toggled(tracks: ScoreTrack[], selected: Set<number>, index: number): Se
   return next.size === 0 ? null : next
 }
 
-export function TrackPicker({ tracks, selected, onChange, muted, onToggleMute }: TrackPickerProps) {
-  const { isAll, activeCount, label } = describeSelection(tracks, selected)
+export function TrackPicker({
+  tracks,
+  selected,
+  onChange,
+  muted,
+  onToggleMute,
+  tile,
+}: TrackPickerProps) {
+  const { count, label } = describeSelection(tracks, selected)
+  // A tile always has a caption.
+  const caption = tile ? (count ?? 'Tracks') : count
 
   function toggle(index: number) {
     const next = toggled(tracks, selected, index)
@@ -76,15 +90,10 @@ export function TrackPicker({ tracks, selected, onChange, muted, onToggleMute }:
           disabled={tracks.length === 0}
           aria-label={`Tracks: ${label}`}
           title={`Tracks: ${label} (t)`}
-          className="px-1.5 tabular-nums"
+          className={tile ? TILE_CLASS : 'px-1.5 tabular-nums pointer-coarse:h-10'}
         >
           <Layers className="size-4" />
-          {/* The count shows only when some tracks are hidden, like speed off 100%. */}
-          {!isAll && (
-            <span className="text-xs">
-              {activeCount}/{tracks.length}
-            </span>
-          )}
+          {caption && <span className="text-xs">{caption}</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-0">
@@ -120,7 +129,7 @@ export function TrackPicker({ tracks, selected, onChange, muted, onToggleMute }:
             const checked = selected.size === 0 || selected.has(track.index)
             return (
               <li key={track.index} className="flex items-center gap-1">
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-neutral-100">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-neutral-100 pointer-coarse:py-2.5">
                   <Checkbox checked={checked} onCheckedChange={() => toggle(track.index)} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-neutral-900">

@@ -5,7 +5,6 @@ import {
   FileText,
   Guitar,
   Link,
-  type LucideIcon,
   Maximize,
   Metronome,
   Minimize,
@@ -24,16 +23,16 @@ import {
 } from 'lucide-react'
 import { AppIcon } from '@/components/AppIcon'
 import { SpeedControl } from '@/components/SpeedControl'
+import { Divider, ToolButton } from '@/components/ToolButton'
+import { ToolbarMenu } from '@/components/ToolbarMenu'
 import { TrackPicker } from '@/components/TrackPicker'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import { cn } from '@/lib/utils'
 import { LAYOUT_LABELS, type Layout } from '@/score/settings'
 import type { BarRange } from '@/score/range'
 import type { ScoreTrack } from '@/score/tracks'
 import type { TabEntry } from '@/types'
 
-interface ToolbarProps {
+export interface ToolbarProps {
   tab: TabEntry | null
   tracks: ScoreTrack[]
   selectedTracks: Set<number>
@@ -48,6 +47,8 @@ interface ToolbarProps {
   scale: number
   layout: Layout
   isFullscreen: boolean
+  /** False where the browser cannot put the app full screen (iPhone). */
+  canFullscreen: boolean
   sidebarOpen: boolean
   isPlayerReady: boolean
   isPlaying: boolean
@@ -78,50 +79,6 @@ interface ToolbarProps {
   onCopyLink: () => void
 }
 
-interface ToolButtonProps {
-  icon: LucideIcon
-  /** Accessible name, and the start of the tooltip. */
-  label: string
-  /** Key hint appended to the tooltip, e.g. "Space". */
-  shortcut?: string
-  /** Replaces the whole tooltip, e.g. to say why the button is disabled. */
-  title?: string
-  onClick: () => void
-  disabled?: boolean
-  /** For on/off toggles: shown pressed, and announced as such. */
-  pressed?: boolean
-}
-
-function ToolButton({
-  icon: Icon,
-  label,
-  shortcut,
-  title,
-  onClick,
-  disabled,
-  pressed,
-}: ToolButtonProps) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      aria-pressed={pressed}
-      title={title ?? (shortcut ? `${label} (${shortcut})` : label)}
-      className={cn(
-        pressed === false && 'text-neutral-400',
-        pressed === true && 'bg-neutral-200 text-neutral-900',
-      )}
-    >
-      <Icon className="size-4" />
-    </Button>
-  )
-}
-
-const Divider = () => <Separator orientation="vertical" className="mx-1 h-6" />
-
 function PieceTitle({ tab }: Pick<ToolbarProps, 'tab'>) {
   return (
     <div className="min-w-0 flex-1 px-1">
@@ -147,18 +104,18 @@ function SongbookButton({
       <ToolButton icon={BookOpen} label="Load a songbook" shortcut="o" onClick={onOpenSongbooks} />
     )
   }
-  // The full name, now that the other controls are icons; the description
-  // (if any) is its tooltip.
+  // The name, now that the other controls are icons, cut short before it
+  // crowds out the piece's title; the description (if any) is its tooltip.
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={onOpenSongbooks}
       title={`${bookDescription ?? bookName}\n\nSwitch or unload songbooks (o)`}
-      className="shrink-0"
+      className="max-w-56"
     >
       <BookOpen className="size-4" />
-      {bookName}
+      <span className="truncate">{bookName}</span>
     </Button>
   )
 }
@@ -254,12 +211,27 @@ function SelectionChip({
   )
 }
 
-function PlaybackControls(
+function PlayPauseButton({
+  isPlayerReady,
+  isPlaying,
+  onPlayPause,
+}: Pick<ToolbarProps, 'isPlayerReady' | 'isPlaying' | 'onPlayPause'>) {
+  return (
+    <ToolButton
+      icon={isPlaying ? Pause : Play}
+      label={isPlaying ? 'Pause' : 'Play'}
+      shortcut="Space"
+      onClick={onPlayPause}
+      disabled={!isPlayerReady}
+    />
+  )
+}
+
+/** The controls for practising a piece, beyond playing and pausing it. */
+function PracticeControls(
   props: Pick<
     ToolbarProps,
     | 'isPlayerReady'
-    | 'isPlaying'
-    | 'onPlayPause'
     | 'onStop'
     | 'speed'
     | 'onSpeedChange'
@@ -270,19 +242,11 @@ function PlaybackControls(
     | 'looping'
     | 'onToggleLooping'
     | 'selection'
-    | 'onClearSelection'
   >,
 ) {
   const playerOff = !props.isPlayerReady
   return (
     <>
-      <ToolButton
-        icon={props.isPlaying ? Pause : Play}
-        label={props.isPlaying ? 'Pause' : 'Play'}
-        shortcut="Space"
-        onClick={props.onPlayPause}
-        disabled={playerOff}
-      />
       <ToolButton
         icon={Square}
         label="Stop"
@@ -315,15 +279,45 @@ function PlaybackControls(
         disabled={playerOff}
         pressed={props.looping}
       />
-      <SelectionChip selection={props.selection} onClearSelection={props.onClearSelection} />
     </>
   )
 }
 
+function WindowControls(
+  props: Pick<
+    ToolbarProps,
+    'isFullscreen' | 'canFullscreen' | 'onToggleFullscreen' | 'onOpenHelp'
+  >,
+) {
+  return (
+    <>
+      {props.canFullscreen && (
+        <ToolButton
+          icon={props.isFullscreen ? Minimize : Maximize}
+          label={props.isFullscreen ? 'Exit full screen' : 'Full screen'}
+          shortcut="f"
+          onClick={props.onToggleFullscreen}
+        />
+      )}
+      <ToolButton
+        icon={CircleHelp}
+        label="Keyboard shortcuts"
+        shortcut="?"
+        onClick={props.onOpenHelp}
+      />
+    </>
+  )
+}
+
+/**
+ * The list toggle, the piece's title and Play are always shown. Practice
+ * controls join them from tablet width (md), and the rest from laptop width
+ * (lg); below that, what is left out is in the menu at the end.
+ */
 export function Toolbar(props: ToolbarProps) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-neutral-200 bg-white px-3">
-      <AppIcon className="mr-1 size-7 shrink-0 text-neutral-900" />
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-neutral-200 bg-white px-2 sm:px-3">
+      <AppIcon className="mr-1 hidden size-7 shrink-0 text-neutral-900 sm:block" />
 
       <ToolButton
         icon={props.sidebarOpen ? PanelLeftClose : PanelLeftOpen}
@@ -332,37 +326,40 @@ export function Toolbar(props: ToolbarProps) {
         onClick={props.onToggleSidebar}
       />
 
-      <Divider />
+      <div className="hidden sm:contents">
+        <Divider />
+      </div>
 
       <PieceTitle tab={props.tab} />
-      <SongbookButton {...props} />
-      <ToolButton icon={Search} label="Search" shortcut="Ctrl+K" onClick={props.onOpenPalette} />
-      <ToolButton
-        icon={Upload}
-        label="Import"
-        title="Import Guitar Pro files or a .sbk (i), or drop them anywhere"
-        onClick={props.onImport}
-      />
-      <CopyLinkButton {...props} />
 
-      <Divider />
-      <ViewControls {...props} />
-      <Divider />
-      <PlaybackControls {...props} />
-      <Divider />
+      <div className="hidden items-center gap-1 lg:flex">
+        <SongbookButton {...props} />
+        <ToolButton icon={Search} label="Search" shortcut="Ctrl+K" onClick={props.onOpenPalette} />
+        <ToolButton
+          icon={Upload}
+          label="Import"
+          title="Import Guitar Pro files or a .sbk (i), or drop them anywhere"
+          onClick={props.onImport}
+        />
+        <CopyLinkButton {...props} />
+        <Divider />
+        <ViewControls {...props} />
+      </div>
 
-      <ToolButton
-        icon={props.isFullscreen ? Minimize : Maximize}
-        label={props.isFullscreen ? 'Exit full screen' : 'Full screen'}
-        shortcut="f"
-        onClick={props.onToggleFullscreen}
-      />
-      <ToolButton
-        icon={CircleHelp}
-        label="Keyboard shortcuts"
-        shortcut="?"
-        onClick={props.onOpenHelp}
-      />
+      <div className="hidden md:contents">
+        <Divider />
+      </div>
+      <PlayPauseButton {...props} />
+      <div className="hidden items-center gap-1 md:flex">
+        <PracticeControls {...props} />
+      </div>
+      <SelectionChip selection={props.selection} onClearSelection={props.onClearSelection} />
+
+      <div className="hidden items-center gap-1 lg:flex">
+        <Divider />
+        <WindowControls {...props} />
+      </div>
+      <ToolbarMenu {...props} />
     </header>
   )
 }

@@ -40,5 +40,6 @@ export function useFullscreen(targetRef: RefObject<HTMLElement | null>) {
     else void enter()
   }, [enter, exit])
 
-  return { isFullscreen, toggle, exit }
+  // False on iPhone, where only video can go full screen.
+  return { isFullscreen, supported: document.fullscreenEnabled === true, toggle, exit }
 }

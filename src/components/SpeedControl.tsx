@@ -1,6 +1,7 @@
 import { Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { TILE_CLASS } from '@/components/ToolButton'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { MAX_SPEED, MIN_SPEED, SPEED_PRESETS, SPEED_STEP } from '@/score/settings'
@@ -9,12 +10,16 @@ interface SpeedControlProps {
   speed: number
   onChange: (value: number) => void
   disabled?: boolean
+  /** Shown as a captioned tile, for the toolbar menu. */
+  tile?: boolean
 }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
-export function SpeedControl({ speed, onChange, disabled }: SpeedControlProps) {
+export function SpeedControl({ speed, onChange, disabled, tile }: SpeedControlProps) {
   const isSlow = speed < 1
+  // A tile always has a caption; the toolbar button only once speed is off 100%.
+  const shown = tile || speed !== 1
 
   return (
     <Popover>
@@ -25,10 +30,13 @@ export function SpeedControl({ speed, onChange, disabled }: SpeedControlProps) {
           disabled={disabled}
           aria-label={`Playback speed ${percent(speed)}`}
           title={`Playback speed ${percent(speed)} (, and .)`}
-          className={cn('px-1.5 tabular-nums', isSlow && 'text-amber-700')}
+          className={cn(
+            tile ? TILE_CLASS : 'px-1.5 tabular-nums pointer-coarse:h-10',
+            isSlow && 'text-amber-700',
+          )}
         >
           <Gauge className="size-4" />
-          {speed !== 1 && <span className="text-xs">{percent(speed)}</span>}
+          {shown && <span className="text-xs">{percent(speed)}</span>}
         </Button>
       </PopoverTrigger>
 
