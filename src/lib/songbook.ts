@@ -11,6 +11,7 @@
 
 import { isLocalBook, readLocalSongbook } from '@/lib/localSongbooks'
 import { isZip, unpackSongbook } from '@/lib/sbk'
+import { afterLast } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
 export interface Songbook {
@@ -82,7 +83,7 @@ export function idAllocator(): (base: string) => string {
 }
 
 function fileStem(url: URL): string {
-  const last = decodeURIComponent(url.pathname.split('/').pop() ?? '')
+  const last = decodeURIComponent(afterLast(url.pathname, '/'))
   return last.replace(/\.[^.]+$/, '')
 }
 
@@ -149,7 +150,7 @@ function parseSong(song: unknown, context: SongContext): TabEntry {
     id: context.uniqueId(slugify(optionalString(song.id) ?? stem) || `song-${n}`),
     title: optionalString(song.title) ?? (stem || `Song ${n}`),
     artist: optionalString(song.artist) ?? '',
-    ext: url.pathname.split('.').pop()?.toLowerCase() ?? '',
+    ext: afterLast(url.pathname, '.').toLowerCase(),
     file: url.href,
   }
 }

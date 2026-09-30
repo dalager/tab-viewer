@@ -1,6 +1,7 @@
 /** Guitar Pro files the user imported themselves: which files qualify, and their IndexedDB store. */
 
 import { IMPORTED_STORE, withStore } from '@/lib/db'
+import { afterLast } from '@/lib/utils'
 
 /** Every imported piece's id starts with this, so stored ids can be told apart. */
 export const IMPORTED_ID_PREFIX = 'imported-'
@@ -41,7 +42,7 @@ export function newImportId(): string {
 
 /** The file's extension, lower case; throws unless alphaTab can open it. */
 export function importExtension(fileName: string): string {
-  const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+  const ext = afterLast(fileName, '.').toLowerCase()
   if (!IMPORT_EXTENSIONS.includes(ext)) {
     throw new Error(`${fileName}: not a Guitar Pro file (${IMPORT_ACCEPT})`)
   }

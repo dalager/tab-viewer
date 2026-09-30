@@ -11,6 +11,7 @@ import {
   SBK_PATH,
   sidebar,
   sidebarRow,
+  storedBookCount,
   title,
   unzipSbk,
 } from './helpers'
@@ -111,6 +112,8 @@ test('a .sbk that is not a songbook is refused with a message', async ({ page })
   await page.keyboard.press('o')
   const books = page.getByRole('dialog', { name: 'Songbooks' })
   await expect(books.getByText('Could not load songbook: not a readable zip', { exact: false })).toBeVisible()
+  // Nothing can open it, so it is not kept.
+  await expect.poll(() => storedBookCount(page)).toBe(0)
   await expect(books.getByText(BOOK_NAME).first()).toBeVisible()
 })
 

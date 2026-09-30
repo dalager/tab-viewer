@@ -57,6 +57,24 @@ export async function seedStorage(page: Page, entries: Record<string, string>) {
   }, entries)
 }
 
+/** How many .sbk files opened from disk this browser holds in IndexedDB. */
+export function storedBookCount(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const req = indexedDB.open('tab-viewer')
+        req.onerror = () => reject(req.error)
+        req.onsuccess = () => {
+          const count = req.result.transaction('songbooks').objectStore('songbooks').count()
+          count.onsuccess = () => {
+            req.result.close()
+            resolve(count.result)
+          }
+        }
+      }),
+  )
+}
+
 /** Waits until alphaTab has painted the open piece's score. */
 export async function expectScoreRendered(page: Page) {
   await expect(page.locator('.at-canvas svg').first()).toBeVisible({ timeout: 45_000 })

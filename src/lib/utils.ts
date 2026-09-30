@@ -5,6 +5,11 @@ export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
+/** What follows the last `separator` in `text`, or all of it when there is none. */
+export function afterLast(text: string, separator: string): string {
+  return text.slice(text.lastIndexOf(separator) + 1)
+}
+
 /** Fetches a file as bytes; works for http and blob URLs alike. */
 export async function fetchBytes(url: string): Promise<Uint8Array<ArrayBuffer>> {
   const response = await fetch(url)

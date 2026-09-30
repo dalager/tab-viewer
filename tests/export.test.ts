@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { exportSongbook } from '@/lib/exportSongbook'
 import { unpackSongbook } from '@/lib/sbk'
 import { IMPORTED_BOOK } from '@/lib/pieces'
-import { errorMessage, fetchBytes, filterTabs } from '@/lib/utils'
+import { afterLast, errorMessage, fetchBytes, filterTabs } from '@/lib/utils'
 import type { TabEntry } from '@/types'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -67,6 +67,18 @@ describe('fetchBytes', () => {
   it('returns the body as bytes', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(new Uint8Array([1, 2, 3]))))
     expect(Array.from(await fetchBytes('https://tabs.example/air.gp5'))).toEqual([1, 2, 3])
+  })
+})
+
+describe('afterLast', () => {
+  it('takes what follows the last separator', () => {
+    expect(afterLast('/books/tabs/air.gp5', '/')).toBe('air.gp5')
+    expect(afterLast('air.min.gp5', '.')).toBe('gp5')
+  })
+
+  it('takes all of it without a separator, and nothing after a trailing one', () => {
+    expect(afterLast('noext', '.')).toBe('noext')
+    expect(afterLast('/books/', '/')).toBe('')
   })
 })
 

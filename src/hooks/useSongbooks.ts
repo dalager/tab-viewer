@@ -150,6 +150,29 @@ async function storeBookFile(file: File): Promise<{ url: string } | { error: str
   }
 }
 
+interface OpenFileContext {
+  /** Loads and activates a book, resolving to null if it did not open. */
+  run: (url: string) => Promise<Songbook | null>
+  /** Reports why the file could not be opened. */
+  fail: (message: string) => void
+}
+
+/**
+ * Stores a .sbk and opens it. A stored copy that does not open (unreadable,
+ * or overtaken by a newer request) is deleted again: nothing refers to it, so
+ * it would only take up space.
+ */
+async function openBookFile(file: File, { run, fail }: OpenFileContext): Promise<Songbook | null> {
+  const stored = await storeBookFile(file)
+  if ('error' in stored) {
+    fail(stored.error)
+    return null
+  }
+  const book = await run(stored.url)
+  if (!book) deleteIfLocal(stored.url)
+  return book
+}
+
 /** The open book. Replacing it releases the previous one and records the choice. */
 function useActiveBook() {
   const [active, setActive] = useState<Songbook | null>(null)
@@ -183,6 +206,11 @@ export function useSongbooks(linkedBook: string | null): UseSongbooks {
   // Guards against a slow response overwriting a book picked after it.
   const loadToken = useRef(0)
 
+  const fail = useCallback((message: string) => {
+    setStatus('error')
+    setError(message)
+  }, [])
+
   /**
    * Fetch and activate, ignoring the result if a newer request superseded it.
    * Callers set `status` to loading themselves; the startup effect must not set state
@@ -194,8 +222,7 @@ export function useSongbooks(linkedBook: string | null): UseSongbooks {
       const outcome = await loadLatest(url, () => token === loadToken.current)
       if (!outcome) return null
       if ('error' in outcome) {
-        setStatus('error')
-        setError(outcome.error)
+        fail(outcome.error)
         return null
       }
       replace(outcome.book)
@@ -204,7 +231,7 @@ export function useSongbooks(linkedBook: string | null): UseSongbooks {
       remember(outcome.book)
       return outcome.book
     },
-    [replace, remember],
+    [replace, remember, fail],
   )
 
   const load = useCallback(
@@ -219,15 +246,11 @@ export function useSongbooks(linkedBook: string | null): UseSongbooks {
   )
 
   const openFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       setStatus('loading')
-      const stored = await storeBookFile(file)
-      if ('url' in stored) return run(stored.url)
-      setStatus('error')
-      setError(stored.error)
-      return null
+      return openBookFile(file, { run, fail })
     },
-    [run],
+    [run, fail],
   )
 
   // The book to start with. `status` was initialised to loading for it.
