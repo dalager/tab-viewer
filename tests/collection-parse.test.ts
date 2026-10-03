@@ -120,6 +120,11 @@ describe('collectionUrl', () => {
     expect(href(' http://store.example/api/books.json ')).toBe('http://store.example/api/books.json')
   })
 
+  it('leaves a file alone: only a last segment without an extension is a folder', () => {
+    expect(href('store.example/lessons.html')).toBe('https://store.example/lessons.html')
+    expect(href('store.example')).toBe('https://store.example/')
+  })
+
   it('resolves a leading slash against this site', () => {
     expect(href('/songbooks')).toBe(`${ORIGIN}/songbooks/`)
   })

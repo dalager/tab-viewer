@@ -1,6 +1,7 @@
 // Collections: an address that lists songbooks. Adding one by hand and by
 // link, opening the books it lists, seeing what its host changed, and what
-// happens when it cannot be read. The test serves the collections itself.
+// happens when it cannot be read; and a web page that names its collection in
+// a <link>, so the page's address can be handed out. The test serves them all.
 
 import { expect, type Page, test } from './fixtures'
 import { expectScoreRendered, openApp, seedStorage, title, toolbar, unzipSbk } from './helpers'
@@ -114,7 +115,8 @@ test('a link adds a collection, shows it, and leaves the address clean', async (
 })
 
 test('a link to something that is not a collection says so and saves nothing', async ({ page }) => {
-  await page.goto('/?addcollection=/songbooks/bach-for-guitar.sbk')
+  // Nothing is there, so the host answers with the app's own page, which names no collection.
+  await page.goto('/?addcollection=/songbooks/nothing-here')
   const dialog = page.getByRole('dialog', { name: 'Songbooks' })
   await expect(dialog.getByText(/Could not add collection: .*collection\.json returned a web page/)).toBeVisible()
   expect(await stored(page)).toBe('[]')
@@ -140,6 +142,65 @@ test('an address that is not a collection is refused, and a songbook is pointed 
   await urlField(dialog).press('Enter')
   await expect(dialog.getByText(/this is a songbook, not a collection/)).toBeVisible()
   await expect(dialog.getByRole('button', { name: /^Remove / })).toHaveCount(0)
+  expect(await stored(page)).toBe('[]')
+})
+
+const COLLECTION_LINK = 'rel="alternate" type="application/vnd.tabviewer.collection+json"'
+
+/** A web page with these tags in its head. */
+const htmlPage = (head: string) => ({
+  contentType: 'text/html',
+  body: `<!doctype html><html><head><title>Lessons</title>${head}</head><body>Welcome</body></html>`,
+})
+
+test('the address of a web page that names its collection adds that collection', async ({ page, baseURL }) => {
+  await serveEasy(page)
+  await page.route('**/test-collections/teacher/collection.json', (route) => route.fulfill({ status: 404 }))
+  // An unrelated feed, two links that cannot be followed, then the collection, relative to the page.
+  await page.route('**/test-collections/teacher/', (route) =>
+    route.fulfill(
+      htmlPage(`
+        <link rel="alternate" type="application/rss+xml" href="/feed.xml">
+        <link ${COLLECTION_LINK} href="javascript:void(0)">
+        <link ${COLLECTION_LINK} href="http://">
+        <link ${COLLECTION_LINK} href="../easy/collection.json" title="Easy pieces">`),
+    ),
+  )
+  await openApp(page)
+  const dialog = await openSongbooks(page)
+  await urlField(dialog).fill('/test-collections/teacher')
+  await urlField(dialog).press('Enter')
+
+  // Books resolve against the collection document, not the page that names it.
+  const easy = dialog.getByRole('listitem', { name: 'Easy pieces' })
+  await expect(easy.getByRole('button', { name: /Week 1/ })).toHaveAttribute(
+    'title',
+    `${baseURL}/test-collections/easy/week-1/songbook.json`,
+  )
+  // What is kept is the page's address, so the page can point somewhere else later.
+  expect(await stored(page)).toBe(
+    JSON.stringify([{ url: `${baseURL}/test-collections/teacher/`, name: 'Easy pieces' }]),
+  )
+})
+
+test('a web page that names no collection, or one that is not there, says so', async ({ page }) => {
+  await page.route('**/test-collections/plain.html', (route) =>
+    route.fulfill(htmlPage('<link rel="stylesheet" href="/site.css">')),
+  )
+  await page.route('**/test-collections/stale.html', (route) =>
+    route.fulfill(htmlPage(`<link ${COLLECTION_LINK} href="moved/collection.json">`)),
+  )
+  await page.route('**/test-collections/moved/collection.json', (route) => route.fulfill({ status: 404 }))
+  await openApp(page)
+  const dialog = await openSongbooks(page)
+
+  await urlField(dialog).fill('/test-collections/plain.html')
+  await urlField(dialog).press('Enter')
+  await expect(dialog.getByText(/plain\.html is a web page that names no collection/)).toBeVisible()
+
+  await urlField(dialog).fill('/test-collections/stale.html')
+  await urlField(dialog).press('Enter')
+  await expect(dialog.getByText(/moved\/collection\.json: 404/)).toBeVisible()
   expect(await stored(page)).toBe('[]')
 })
 

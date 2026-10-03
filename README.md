@@ -125,13 +125,29 @@ a complete collection.
 To add one, press `o` and paste its address under *Collections*:
 
 - An address ending in `.json` is read as it is.
-- Anything else is taken as a folder, and `collection.json` is read from it:
+- A folder has `collection.json` read from it:
   `https://example.com/songbooks_easy/`, with or without the trailing slash.
+- A web page that names its collection (see below) can be given instead:
+  `https://example.com/lessons.html`, or a folder address whose page does.
 - Without a scheme it means `https://`, so `example.com/songbooks_easy` works.
 
 A link does the same in one step: `/?addcollection=example.com/songbooks_easy`
 adds the collection, opens the songbook dialog on it and drops the parameter
 from the address. Following the link again changes nothing.
+
+A web page names its collection the way a page names its feed, with a link in
+its `<head>` that visitors do not see:
+
+```html
+<link rel="alternate" type="application/vnd.tabviewer.collection+json"
+      href="songbooks/collection.json">
+```
+
+`href` resolves against the page, and the first such link is used. The page's
+address then works as the collection's, so the page can later point somewhere
+else. This only works on a host that lets other sites read its pages (CORS on
+the HTML itself; GitHub Pages does, most site builders do not). Where it does
+not, link to the app with `?addcollection=` instead, which works from any page.
 
 The app keeps only the collection's address, in `localStorage`, and reads the
 list afresh every time the songbook dialog opens. So whoever hosts the

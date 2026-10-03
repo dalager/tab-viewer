@@ -75,6 +75,50 @@ describe('fetchCollection', () => {
   })
 })
 
+describe('fetchCollection, given a page rather than a document', () => {
+  const PAGE = new URL('https://store.example/lessons.html')
+
+  /** Each address answers with its own response, anything else with 404. */
+  function serveEach(answers: Record<string, () => Response>) {
+    fetchMock.mockImplementation(async (input) => {
+      const answer = answers[String(input)]
+      return answer ? answer() : new Response('', { status: 404, statusText: 'Not Found' })
+    })
+  }
+
+  it('looks at the folder address itself when it holds no collection.json', async () => {
+    serveEach({})
+    // Neither is there, so what is reported is the document that was asked for first.
+    expect(await errorOf()).toBe(`${DOC}: 404 Not Found`)
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([DOC, FOLDER.href])
+  })
+
+  it('keeps the first failure when the folder address cannot be reached either', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    expect(await errorOf()).toBe(`could not reach ${DOC} (offline, or the host does not allow CORS)`)
+  })
+
+  it('reads a file that is not .json as the document when it holds one', async () => {
+    serveEach({ [PAGE.href]: () => new Response(JSON.stringify(EASY)) })
+    const result = await fetchCollection(PAGE)
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(PAGE.href, { cache: 'no-cache' })
+    expect(result).toMatchObject({
+      status: 'ready',
+      collection: { books: [{ url: 'https://store.example/week-1.sbk' }] },
+    })
+  })
+
+  it('reports a page that cannot be fetched', async () => {
+    serveEach({})
+    expect(await errorOf(PAGE)).toBe(`${PAGE}: 404 Not Found`)
+  })
+
+  it('refuses a file that is neither a page nor JSON', async () => {
+    serveEach({ [PAGE.href]: () => new Response('PK not json') })
+    expect(await errorOf(PAGE)).toBe(`${PAGE} is not JSON`)
+  })
+})
+
 describe('resolveCollection', () => {
   it('saves the normalised address with the name the collection gives', async () => {
     serve(EASY)

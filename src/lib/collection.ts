@@ -10,6 +10,7 @@
  */
 
 import { fileStem, isRecord, optionalString } from '@/lib/songbook'
+import { afterLast } from '@/lib/utils'
 
 /** The format this app reads, the document's `collection` field. */
 export const COLLECTION_VERSION = 1
@@ -19,6 +20,9 @@ export const COLLECTION_SCHEMA = 'https://tabviewer.dalagerlabs.com/schema/colle
 
 /** The document a collection given as a folder is read from. */
 export const COLLECTION_FILE = 'collection.json'
+
+/** The media type a web page gives its collection in a `<link rel="alternate">`; see discover.ts. */
+export const COLLECTION_TYPE = 'application/vnd.tabviewer.collection+json'
 
 export interface CollectionBook {
   /** Absolute songbook or .sbk URL: the same identity the book has once loaded. */
@@ -135,9 +139,10 @@ function withScheme(text: string): string {
 
 /**
  * The address of a collection as typed or linked, made absolute. A bare
- * "host/folder" means https, and a leading "/" means this site. Anything not
- * ending in .json is a folder and gets its trailing slash, so both spellings
- * of a folder are one collection.
+ * "host/folder" means https, and a leading "/" means this site. A last
+ * segment without an extension is a folder and gets its trailing slash, so
+ * both spellings of a folder are one collection; "books.json" and
+ * "page.html" are files and stay as they are.
  */
 export function collectionUrl(input: string, origin: string): URL {
   const text = input.trim()
@@ -158,9 +163,10 @@ function absolute(text: string, origin: string): URL {
   }
 }
 
-/** Whether a path names a folder without its trailing slash. */
+/** Whether a path names a folder without its trailing slash: its last segment has no extension. */
 function lacksSlash(pathname: string): boolean {
-  return !pathname.endsWith('.json') && !pathname.endsWith('/')
+  const last = afterLast(pathname, '/')
+  return last !== '' && !last.includes('.')
 }
 
 /** The document to fetch for a collection: itself, or collection.json in its folder. */
