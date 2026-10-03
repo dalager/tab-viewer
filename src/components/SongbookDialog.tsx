@@ -1,5 +1,7 @@
 import { BookOpen, Download, X } from 'lucide-react'
 import { useState } from 'react'
+import { Collections } from '@/components/Collections'
+import { SectionLabel } from '@/components/SectionLabel'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,14 +11,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import type { UseCollections } from '@/hooks/useCollections'
 import type { RememberedBook, UseSongbooks } from '@/hooks/useSongbooks'
 import { downloadFile, exportSongbook } from '@/lib/exportSongbook'
 import { isLocalBook } from '@/lib/localSongbooks'
 import { absoluteBookUrl, type Songbook, SUGGESTED_SONGBOOKS } from '@/lib/songbook'
 import { cn, errorMessage } from '@/lib/utils'
 
-interface SongbookPickerProps {
+export interface SongbookPickerProps {
   songbooks: UseSongbooks
+  /** The collections of songbooks added in this browser. */
+  collections: UseCollections
   /** Called after a book loads successfully, e.g. to select its first piece. */
   onLoaded: (book: Songbook) => void
   /** Opens the file picker, which takes .sbk songbooks as well as Guitar Pro files. */
@@ -26,14 +31,6 @@ interface SongbookPickerProps {
 /** Where a book lives, for display: its URL, or a note for one opened from a file. */
 function describeUrl(url: string): string {
   return isLocalBook(url) ? 'Opened from a file, stored in this browser' : url
-}
-
-function SectionLabel({ children }: { children: string }) {
-  return (
-    <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-      {children}
-    </h3>
-  )
 }
 
 /** Packs the loaded book into a fresh .sbk, whatever form it was loaded in, and downloads it. */
@@ -261,12 +258,15 @@ function RememberedList({ remembered, activeUrl, onClearAll, ...row }: Remembere
 }
 
 /**
- * Everything needed to pick a songbook: a URL field, the bundled suggestions
- * and the books loaded before. Shared by the dialog and the empty state.
+ * Everything needed to pick a songbook: a URL field, the bundled suggestions,
+ * the books loaded before and the collections added. Shared by the dialog and
+ * the empty state.
  */
-export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPickerProps) {
+export function SongbookPicker(props: SongbookPickerProps) {
+  const { songbooks, collections, onLoaded, onOpenFile } = props
   const { active, remembered, status, error, load, unload, forget, clearAll } = songbooks
   const loading = status === 'loading'
+  const activeUrl = active?.url
 
   const open = async (target: string) => {
     const book = await load(target)
@@ -281,11 +281,17 @@ export function SongbookPicker({ songbooks, onLoaded, onOpenFile }: SongbookPick
       <Suggestions remembered={remembered} loading={loading} onOpen={(u) => void open(u)} />
       <RememberedList
         remembered={remembered}
-        activeUrl={active?.url}
+        activeUrl={activeUrl}
         loading={loading}
         onOpen={(u) => void open(u)}
         onForget={forget}
         onClearAll={clearAll}
+      />
+      <Collections
+        collections={collections}
+        activeUrl={activeUrl}
+        loading={loading}
+        onOpen={(u) => void open(u)}
       />
     </div>
   )
@@ -296,13 +302,7 @@ interface SongbookDialogProps extends SongbookPickerProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function SongbookDialog({
-  open,
-  onOpenChange,
-  songbooks,
-  onLoaded,
-  onOpenFile,
-}: SongbookDialogProps) {
+export function SongbookDialog({ open, onOpenChange, onLoaded, ...picker }: SongbookDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -310,13 +310,12 @@ export function SongbookDialog({
           <DialogTitle>Songbooks</DialogTitle>
           <DialogDescription>
             A songbook is a JSON file listing Guitar Pro files, or a .sbk file packing them
-            into one download.
+            into one download. A collection lists songbooks.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[65vh] overflow-y-auto pr-1">
           <SongbookPicker
-            songbooks={songbooks}
-            onOpenFile={onOpenFile}
+            {...picker}
             onLoaded={(book) => {
               onLoaded(book)
               onOpenChange(false)

@@ -10,6 +10,11 @@ export function afterLast(text: string, separator: string): string {
   return text.slice(text.lastIndexOf(separator) + 1)
 }
 
+/** Whether a response body is a web page: what a host sends for a missing file or a sign-in. */
+export function looksLikeHtml(text: string): boolean {
+  return text.trimStart().startsWith('<')
+}
+
 /** Fetches a file as bytes; works for http and blob URLs alike. */
 export async function fetchBytes(url: string): Promise<Uint8Array<ArrayBuffer>> {
   const response = await fetch(url)

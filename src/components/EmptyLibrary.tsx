@@ -1,15 +1,7 @@
-import { SongbookPicker } from '@/components/SongbookDialog'
-import type { UseSongbooks } from '@/hooks/useSongbooks'
-import type { Songbook } from '@/lib/songbook'
-
-interface EmptyLibraryProps {
-  songbooks: UseSongbooks
-  onLoaded: (book: Songbook) => void
-  onOpenFile: () => void
-}
+import { SongbookPicker, type SongbookPickerProps } from '@/components/SongbookDialog'
 
 /** Covers the score when there is nothing to read: no songbook and no imports. */
-export function EmptyLibrary({ songbooks, onLoaded, onOpenFile }: EmptyLibraryProps) {
+export function EmptyLibrary(picker: SongbookPickerProps) {
   return (
     <div className="absolute inset-0 z-20 flex items-start justify-center overflow-y-auto bg-white p-6 sm:pt-16">
       <div className="w-full max-w-lg">
@@ -18,7 +10,7 @@ export function EmptyLibrary({ songbooks, onLoaded, onOpenFile }: EmptyLibraryPr
           Paste the URL of a songbook, pick one below, or drop a .sbk songbook or Guitar Pro
           files anywhere.
         </p>
-        <SongbookPicker songbooks={songbooks} onLoaded={onLoaded} onOpenFile={onOpenFile} />
+        <SongbookPicker {...picker} />
       </div>
     </div>
   )

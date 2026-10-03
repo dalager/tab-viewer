@@ -82,16 +82,18 @@ export function idAllocator(): (base: string) => string {
   }
 }
 
-function fileStem(url: URL): string {
+/** The last path segment of a URL without its extension: "air" for /tabs/air.gp5. */
+export function fileStem(url: URL): string {
   const last = decodeURIComponent(afterLast(url.pathname, '/'))
   return last.replace(/\.[^.]+$/, '')
 }
 
-function optionalString(value: unknown): string | undefined {
+/** A string trimmed, or undefined when it is not a string or is blank. */
+export function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 

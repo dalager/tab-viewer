@@ -4,6 +4,9 @@
  *
  * `bar` is 1-based, matching the bar numbers printed in the score. A link
  * without `book` resolves against whichever songbook is loaded.
+ *
+ * `?addcollection=<url>` on any address adds that collection of songbooks to
+ * this browser's list; the app takes it out of the address once it has read it.
  */
 
 import { absoluteBookUrl, shortBookUrl } from '@/lib/songbook'
@@ -30,6 +33,23 @@ export function parseLocation(loc: Location = window.location): Permalink {
     // A malformed book link is treated as no book at all.
   }
   return { id, bar: bar && bar > 0 ? bar : null, book }
+}
+
+const ADD_COLLECTION = 'addcollection'
+
+/** The collection a link asks to add, as written, or null when it names none. */
+export function addCollectionParam(loc: Pick<Location, 'search'> = window.location): string | null {
+  return new URLSearchParams(loc.search).get(ADD_COLLECTION)?.trim() || null
+}
+
+/** The address without its `addcollection`, for the address bar once it has been read. */
+export function withoutAddCollection(
+  loc: Pick<Location, 'pathname' | 'search' | 'hash'> = window.location,
+): string {
+  const params = new URLSearchParams(loc.search)
+  params.delete(ADD_COLLECTION)
+  const query = params.toString()
+  return `${loc.pathname}${query ? `?${query}` : ''}${loc.hash}`
 }
 
 /** Query-safe, but leaves `/` and `:` readable: `?book=/songbooks/bach/songbook.json`. */

@@ -11,6 +11,7 @@ import { TabCommandPalette } from '@/components/TabCommandPalette'
 import { TabSidebar } from '@/components/TabSidebar'
 import { Toolbar } from '@/components/Toolbar'
 import { type UseAlphaTab, useAlphaTab } from '@/hooks/useAlphaTab'
+import { useCollections } from '@/hooks/useCollections'
 import { useCopyLink } from '@/hooks/useCopyLink'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useFileDrop } from '@/hooks/useFileDrop'
@@ -18,11 +19,11 @@ import { useFileImport } from '@/hooks/useFileImport'
 import { useFullscreen } from '@/hooks/useFullscreen'
 import { useHotkeys } from '@/hooks/useHotkeys'
 import { useImportedTabs } from '@/hooks/useImportedTabs'
-import { useOverlay } from '@/hooks/useOverlay'
+import { type Overlay, useOverlay } from '@/hooks/useOverlay'
 import { usePieceSelection } from '@/hooks/usePieceSelection'
 import { useSidebar } from '@/hooks/useSidebar'
 import { useSongbooks } from '@/hooks/useSongbooks'
-import { parseLocation } from '@/lib/permalink'
+import { addCollectionParam, parseLocation } from '@/lib/permalink'
 import type { PieceRef } from '@/lib/pieces'
 import type { Songbook } from '@/lib/songbook'
 import { SPEED_STEP } from '@/score/settings'
@@ -37,6 +38,11 @@ function allPieces(imported: TabEntry[], book: Songbook | null): TabEntry[] {
 /** Section headings for the sidebar, by book URL. */
 function bookNamesOf(book: Songbook | null): Record<string, string> {
   return book ? { [book.url]: book.name } : {}
+}
+
+/** The dialog to start in: a link that adds a collection opens the songbooks, to show it. */
+function startOverlay(linkedCollection: string | null): Overlay | null {
+  return linkedCollection ? 'songbooks' : null
 }
 
 /** Loads the open piece into the score, starting at its top. */
@@ -165,12 +171,13 @@ export default function App() {
 
   const sidebar = useSidebar()
   const toggleSidebar = sidebar.toggle
-  const overlay = useOverlay()
-
   const imports = useImportedTabs()
-  // The address is read once, here: which book, piece and bar to open first.
-  // Back/Forward is followed by usePieceSelection from then on.
+  // The address is read once, here: which book, piece and bar to open first,
+  // and a collection to add. Back/Forward is followed by usePieceSelection from then on.
   const [startLink] = useState(() => parseLocation())
+  const [linkedCollection] = useState(() => addCollectionParam())
+  const overlay = useOverlay(startOverlay(linkedCollection))
+  const collections = useCollections(linkedCollection)
   const songbooks = useSongbooks(startLink.book)
   const book = songbooks.active
   const bookName = book ? book.name : null
@@ -263,7 +270,12 @@ export default function App() {
           cursorVisible={score.cursorVisible}
         />
         {settled && allTabs.length === 0 && (
-          <EmptyLibrary songbooks={songbooks} onLoaded={onBookLoaded} onOpenFile={files.pickFiles} />
+          <EmptyLibrary
+            songbooks={songbooks}
+            collections={collections}
+            onLoaded={onBookLoaded}
+            onOpenFile={files.pickFiles}
+          />
         )}
       </div>
 
@@ -271,6 +283,7 @@ export default function App() {
       <SongbookDialog
         onOpenFile={files.pickFiles}
         songbooks={songbooks}
+        collections={collections}
         {...overlay.dialogProps('songbooks')}
         onLoaded={onBookLoaded}
       />

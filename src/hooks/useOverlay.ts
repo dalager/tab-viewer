@@ -2,9 +2,12 @@ import { useCallback, useState } from 'react'
 
 export type Overlay = 'palette' | 'help' | 'songbooks' | 'export'
 
-/** Which dialog is open; at most one is at a time, and Escape closes it. */
-export function useOverlay() {
-  const [overlay, setOverlay] = useState<Overlay | null>(null)
+/**
+ * Which dialog is open; at most one is at a time, and Escape closes it.
+ * `initial` is the one a link asked for, open from the first render.
+ */
+export function useOverlay(initial: Overlay | null = null) {
+  const [overlay, setOverlay] = useState<Overlay | null>(initial)
 
   /** A handler that opens this dialog, for buttons and shortcuts. */
   const opener = useCallback((which: Overlay) => () => setOverlay(which), [])

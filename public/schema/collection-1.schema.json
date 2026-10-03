@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tabviewer.dalagerlabs.com/schema/collection-1.schema.json",
+  "title": "Songbook collection, version 1",
+  "description": "A collection.json: a named list of songbooks, hosted at any URL. Book URLs resolve against the collection document's own URL, so a folder holding collection.json and its .sbk files is a complete collection. Extensions go in properties prefixed with \"x-\", which readers ignore.",
+  "type": "object",
+  "required": ["collection", "name", "books"],
+  "properties": {
+    "$schema": {
+      "description": "URI of this schema, so editors can validate the file.",
+      "type": "string",
+      "format": "uri"
+    },
+    "collection": {
+      "description": "Format version. An incompatible future format will use a new number.",
+      "const": 1
+    },
+    "name": {
+      "description": "Display name of the collection.",
+      "$ref": "#/$defs/text"
+    },
+    "description": {
+      "description": "One or two sentences about the collection.",
+      "$ref": "#/$defs/text"
+    },
+    "books": {
+      "description": "The songbooks, in display order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/book" }
+    }
+  },
+  "patternProperties": {
+    "^x-": true
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "description": "A string with at least one non-whitespace character. Readers trim it.",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "book": {
+      "type": "object",
+      "required": ["url", "name"],
+      "properties": {
+        "url": {
+          "description": "Where the songbook (a .sbk file or a songbook.json) is: a relative reference, resolved against the collection document's URL, or an absolute http(s) URL. Other schemes are rejected. The resolved URL is the book's identity: links and favourites use it, so keep it when replacing the file.",
+          "type": "string",
+          "format": "uri-reference",
+          "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]?:|(?![A-Za-z][A-Za-z0-9+.\\-]*:))\\S(?:.*\\S)?$",
+          "examples": ["week-1.sbk", "https://example.com/books/bach/songbook.json"]
+        },
+        "name": {
+          "description": "Display name of the songbook, normally the name in its own manifest.",
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "description": "One or two sentences about the songbook.",
+          "$ref": "#/$defs/text"
+        },
+        "songs": {
+          "description": "How many pieces the songbook holds.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "size": {
+          "description": "Size of the songbook file in bytes.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated": {
+          "description": "When the songbook file last changed.",
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    }
+  },
+  "examples": [
+    {
+      "$schema": "https://tabviewer.dalagerlabs.com/schema/collection-1.schema.json",
+      "collection": 1,
+      "name": "Easy pieces, autumn term",
+      "description": "One songbook a week.",
+      "books": [
+        {
+          "url": "week-1.sbk",
+          "name": "Week 1",
+          "songs": 4,
+          "size": 32797,
+          "updated": "2026-09-30T19:04:00Z"
+        }
+      ]
+    }
+  ]
+}

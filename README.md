@@ -99,6 +99,70 @@ name and an optional description, then either *Download .sbk* to share it, or
 *Save & open* to keep it in this browser and switch to it. Pieces are renamed
 after their titles inside the file, so imports get readable ids.
 
+## Collections
+
+A collection is an address that lists songbooks, so a set of books can be
+handed out and kept up to date from one place: a teacher's books for a class,
+or your own books on every device you use. It is a JSON file at any URL:
+
+```json
+{
+  "collection": 1,
+  "name": "Easy pieces, autumn term",
+  "description": "optional",
+  "books": [
+    { "url": "week-1.sbk", "name": "Week 1", "songs": 4 }
+  ]
+}
+```
+
+`url` and `name` are required per book; `description`, `songs` (piece count),
+`size` (bytes) and `updated` (a date-time) are optional. A book's `url`
+resolves against the collection's own URL and may point at a `.sbk` or a
+`songbook.json`, so a folder holding `collection.json` and its `.sbk` files is
+a complete collection.
+
+To add one, press `o` and paste its address under *Collections*:
+
+- An address ending in `.json` is read as it is.
+- Anything else is taken as a folder, and `collection.json` is read from it:
+  `https://example.com/songbooks_easy/`, with or without the trailing slash.
+- Without a scheme it means `https://`, so `example.com/songbooks_easy` works.
+
+A link does the same in one step: `/?addcollection=example.com/songbooks_easy`
+adds the collection, opens the songbook dialog on it and drops the parameter
+from the address. Following the link again changes nothing.
+
+The app keeps only the collection's address, in `localStorage`, and reads the
+list afresh every time the songbook dialog opens. So whoever hosts the
+collection distributes changes by editing it: a book added to `collection.json`
+shows up on every device, and a `.sbk` replaced under the same URL is what
+opens from then on. Keep a book's URL when you replace it: links and favourites
+refer to the book by it. Removing a collection in the dialog only takes it off
+the list; books already loaded from it stay under *Previously loaded*.
+
+The app ships with no collections, and a collection needs no login: it and
+every book it lists must be readable with a plain `GET`, with CORS headers that
+allow the viewer's origin when hosted elsewhere, and over `https` when the
+viewer is.
+
+To make one from a folder of `.sbk` files:
+
+```sh
+npm run collection -- my-books --name "Easy pieces, autumn term"
+```
+
+That writes `my-books/collection.json`, taking each book's name, description
+and piece count from the book itself. Run it again after adding, replacing or
+removing a book, then upload the folder.
+
+The format is specified by
+[`public/schema/collection-1.schema.json`](public/schema/collection-1.schema.json),
+served at <https://tabviewer.dalagerlabs.com/schema/collection-1.schema.json>,
+under the same rules as the songbook schema: `x-` keys for custom properties,
+and a frozen file per `collection` version. Unlike a songbook, a collection
+must state its version.
+
 ## The bundled songbook
 
 *Starter pieces* lives in the repo as a single file,
@@ -214,6 +278,9 @@ To ship your own songbooks, put `.sbk` files in `songbooks/` and list them in
 `SUGGESTED_SONGBOOKS` in `src/lib/songbook.ts`; the first entry is the one a
 first visit opens.
 
+To offer many books without rebuilding, host a [collection](#collections) and
+hand out its address or an `?addcollection=` link.
+
 ### Cloudflare Workers
 
 `wrangler.jsonc` deploys `dist/` as a static-assets Worker, served at
@@ -254,7 +321,8 @@ or, with nginx, `try_files $uri /index.html;` in the site's `location /`.
 npm run build     # production build into dist/
 npm run preview   # serve the production build locally
 npm run lint      # oxlint, including a complexity limit
-npm test          # vitest: unit tests, and the songbook schema checks
+npm test          # vitest: unit tests, and the songbook and collection schema checks
+npm run collection -- <folder>  # write collection.json for a folder of .sbk files
 npm run test:e2e  # Playwright: builds the app and drives it in Chromium
 npm run test:coverage  # both, measuring coverage of src/, and one merged report
 ```

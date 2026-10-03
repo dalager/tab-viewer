@@ -10,6 +10,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "songbooks": "node scripts/copy-songbooks.mjs",
+    "collection": "node scripts/make-collection.mjs",
     "predev": "npm run songbooks && npm run soundfont",
     "prebuild": "npm run songbooks && npm run soundfont",
     "soundfont": "node scripts/fetch-soundfont.mjs",

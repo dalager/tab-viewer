@@ -2,7 +2,13 @@
 // app writes parse back to the same piece, bar and songbook.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseLocation, piecePath, pieceUrl } from '@/lib/permalink'
+import {
+  addCollectionParam,
+  parseLocation,
+  piecePath,
+  pieceUrl,
+  withoutAddCollection,
+} from '@/lib/permalink'
 
 const ORIGIN = 'https://tabs.example'
 
@@ -79,5 +85,36 @@ describe('piecePath', () => {
 describe('pieceUrl', () => {
   it('is the piece path on this site', () => {
     expect(pieceUrl('air', 4)).toBe(`${ORIGIN}/p/air?bar=4`)
+  })
+})
+
+describe('addcollection links', () => {
+  /** The parts of the address bar for a site-relative address. */
+  function at(address: string) {
+    const { pathname, search, hash } = new URL(address, ORIGIN)
+    return { pathname, search, hash }
+  }
+
+  it('reads the collection a link asks to add, as written', () => {
+    expect(addCollectionParam(at('/?addcollection=samplestore.meh/songbooks_easy'))).toBe(
+      'samplestore.meh/songbooks_easy',
+    )
+    expect(addCollectionParam(at('/p/air?book=/b.sbk&addcollection=https%3A%2F%2Fa.example%2Fx%2F'))).toBe(
+      'https://a.example/x/',
+    )
+  })
+
+  it.each(['/', '/p/air?bar=2', '/?addcollection=', '/?addcollection=%20'])('finds none in %s', (address) => {
+    expect(addCollectionParam(at(address))).toBeNull()
+  })
+
+  it('takes it out of the address and leaves the rest', () => {
+    expect(withoutAddCollection(at('/?addcollection=samplestore.meh/easy'))).toBe('/')
+    expect(withoutAddCollection(at('/p/air?bar=2&addcollection=a.example/x#top'))).toBe('/p/air?bar=2#top')
+  })
+
+  it('keeps a piece link pointing at the same book and bar', () => {
+    const address = withoutAddCollection(at('/p/air?book=/songbooks/bach.sbk&bar=3&addcollection=a.example'))
+    expect(parse(address)).toEqual({ id: 'air', bar: 3, book: `${ORIGIN}/songbooks/bach.sbk` })
   })
 })
